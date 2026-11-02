@@ -698,29 +698,29 @@ const hospitals: HospitalSpec[] = [
 ];
 
 async function main() {
-  console.log("Seeding जीवन Sahay database…");
-
-  await db.auditLog.deleteMany();
-  await db.chatMessage.deleteMany();
-  await db.chatSession.deleteMany();
-  await db.notification.deleteMany();
-  await db.searchRecord.deleteMany();
-  await db.savedHospital.deleteMany();
-  await db.dailyStat.deleteMany();
-  await db.report.deleteMany();
-  await db.doctor.deleteMany();
-  await db.service.deleteMany();
-  await db.bedInventory.deleteMany();
-  await db.hospital.deleteMany();
-  await db.user.deleteMany();
-
-  const passwordHash = await bcrypt.hash("Demo@1234", 12);
+  const seedDemoData = process.env.SEED_DEMO_DATA === "true";
+  if (seedDemoData) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Demo fixtures are disabled in production.");
+    }
+    const [users, hospitalsCount, reports, audits] = await Promise.all([
+      db.user.count(),
+      db.hospital.count(),
+      db.report.count(),
+      db.auditLog.count(),
+    ]);
+    if (users + hospitalsCount + reports + audits > 0) {
+      throw new Error("Demo seeding requires an empty database. No records were changed.");
+    }
+    console.log("Seeding disposable demo data…");
+    const passwordHash = await bcrypt.hash("Demo@1234", 12);
 
   const patient = await db.user.create({
     data: {
       name: "Aarav Sharma",
       email: "patient@demo.in",
       passwordHash,
+      emailVerifiedAt: new Date(),
       role: "PATIENT",
       phone: "+91 98110 12345",
       age: 34,
@@ -768,7 +768,7 @@ async function main() {
         ]),
         rejectionReason: spec.rejectionReason ?? null,
         verifiedAt: spec.status === "VERIFIED" ? ago(60 * 24 * 30) : null,
-        verifiedBy: spec.status === "VERIFIED" ? "super@demo.in" : null,
+        verifiedBy: spec.status === "VERIFIED" ? "seed-fixture" : null,
         lastAvailabilityUpdate: ago(spec.updatedMinutesAgo),
       },
     });
@@ -817,21 +817,13 @@ async function main() {
       name: "Dr. Meera Krishnan",
       email: "hospital@demo.in",
       passwordHash,
+      emailVerifiedAt: new Date(),
       role: "HOSPITAL_ADMIN",
       phone: "+91 98100 90000",
       hospitalId: created["city"].id,
     },
   });
 
-  await db.user.create({
-    data: {
-      name: "Platform Administrator",
-      email: "super@demo.in",
-      passwordHash,
-      role: "SUPER_ADMIN",
-      phone: "+91 11000 00001",
-    },
-  });
 
   // ---------- Daily stats (last 14 days) ----------
   for (const spec of hospitals.filter((h) => h.status === "VERIFIED")) {
@@ -936,8 +928,39 @@ async function main() {
     ],
   });
 
-  console.log(`✔ Seeded ${hospitals.length} hospitals, users and demo data.`);
-  console.log("  patient@demo.in | hospital@demo.in | super@demo.in — password: Demo@1234");
+  console.log(`Seeded ${hospitals.length} hospitals and demo data. Demo accounts use the documented development-only password.`);
+  }
+
+  const adminEmail = process.env.SEED_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.SEED_SUPER_ADMIN_PASSWORD;
+  if (Boolean(adminEmail) !== Boolean(adminPassword)) {
+    throw new Error("Set both SEED_SUPER_ADMIN_EMAIL and SEED_SUPER_ADMIN_PASSWORD, or neither.");
+  }
+  if (adminEmail && adminPassword) {
+    if (!adminEmail.includes("@") || adminPassword.length < 16 || Buffer.byteLength(adminPassword, "utf8") > 72) {
+      throw new Error("Use a valid admin email and a unique password between 16 and 72 bytes.");
+    }
+    const existingAdmin = await db.user.findUnique({ where: { email: adminEmail } });
+    if (existingAdmin) {
+      if (existingAdmin.role !== "SUPER_ADMIN") {
+        throw new Error("Refusing to promote an existing non-admin account.");
+      }
+      console.log("The configured super-admin account already exists; it was left unchanged.");
+    } else {
+      await db.user.create({
+        data: {
+          name: process.env.SEED_SUPER_ADMIN_NAME?.trim() || "Platform Administrator",
+          email: adminEmail,
+          passwordHash: await bcrypt.hash(adminPassword, 12),
+          role: "SUPER_ADMIN",
+          status: "ACTIVE",
+          emailVerifiedAt: new Date(),
+        },
+      });
+      console.log("Provisioned the configured super-admin account.");
+    }
+  }
+  if (!seedDemoData && !adminEmail) console.log("No seed changes requested.");
 }
 
 main()

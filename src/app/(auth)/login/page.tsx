@@ -84,29 +84,39 @@ function Modal({
 
 /* ------------------------------ OTP boxes ----------------------------- */
 
-function OtpBoxes() {
-  const [digits, setDigits] = React.useState<string[]>(Array(6).fill(""));
+function OtpBoxes({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const refs = React.useRef<(HTMLInputElement | null)[]>([]);
+  const digits = Array.from({ length: 6 }, (_, index) => value[index] ?? "");
 
-  const setDigit = (i: number, v: string) => {
-    setDigits((d) => d.map((x, j) => (j === i ? v : x)));
-    if (v && i < 5) refs.current[i + 1]?.focus();
+  const setDigit = (index: number, digit: string) => {
+    const next = digits.slice();
+    next[index] = digit;
+    onChange(next.join("").slice(0, 6));
+    if (digit && index < 5) refs.current[index + 1]?.focus();
   };
 
   return (
     <div className="flex justify-between gap-2" role="group" aria-label="6-digit OTP">
-      {digits.map((d, i) => (
+      {digits.map((digit, index) => (
         <input
-          key={i}
-          ref={(el) => { refs.current[i] = el; }}
-          value={d}
-          onChange={(e) => setDigit(i, e.target.value.replace(/\D/g, "").slice(0, 1))}
-          onKeyDown={(e) => {
-            if (e.key === "Backspace" && !digits[i] && i > 0) refs.current[i - 1]?.focus();
+          key={index}
+          ref={(element) => { refs.current[index] = element; }}
+          value={digit}
+          onChange={(event) => setDigit(index, event.target.value.replace(/\D/g, "").slice(-1))}
+          onPaste={(event) => {
+            const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+            if (pasted) {
+              event.preventDefault();
+              onChange(pasted);
+              refs.current[Math.min(pasted.length, 5)]?.focus();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Backspace" && !digits[index] && index > 0) refs.current[index - 1]?.focus();
           }}
           inputMode="numeric"
-          autoComplete="one-time-code"
-          aria-label={`Digit ${i + 1}`}
+          autoComplete={index === 0 ? "one-time-code" : "off"}
+          aria-label={`Digit ${index + 1}`}
           className="h-12 w-full rounded-[10px] border border-[#D7E0EC] bg-white text-center text-lg font-bold text-[#102A56] outline-none transition-colors focus:border-[#062B67] focus:ring-2 focus:ring-[#062B67]/15"
         />
       ))}
@@ -126,6 +136,21 @@ function LoginForm() {
   const [role, setRole] = React.useState<Role>(null);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [rememberMe, setRememberMe] = React.useState(true);
+  const [otpCode, setOtpCode] = React.useState("");
+  const [otpSent, setOtpSent] = React.useState(false);
+  const [otpLoading, setOtpLoading] = React.useState(false);
+  const [otpSeconds, setOtpSeconds] = React.useState(0);
+  const [otpNote, setOtpNote] = React.useState("");
+  const [recoveryStep, setRecoveryStep] = React.useState<"email" | "code" | "password" | "done">("email");
+  const [recoveryEmail, setRecoveryEmail] = React.useState("");
+  const [recoveryCode, setRecoveryCode] = React.useState("");
+  const [recoveryPassword, setRecoveryPassword] = React.useState("");
+  const [recoveryConfirm, setRecoveryConfirm] = React.useState("");
+  const [recoveryLoading, setRecoveryLoading] = React.useState(false);
+  const [recoveryError, setRecoveryError] = React.useState("");
+  const [recoveryMessage, setRecoveryMessage] = React.useState("");
+  const [recoverySeconds, setRecoverySeconds] = React.useState(0);
   const [showPassword, setShowPassword] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -140,13 +165,41 @@ function LoginForm() {
       google_state_mismatch: "Security validation failed. Please try again.",
       google_config_missing: "Google OAuth is not configured. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
       google_email_missing: "Google account has no email. Please use another account.",
+      google_email_unverified: "Google could not verify this email address. Please use another account.",
+      google_account_link_conflict: "This Google account is linked to a different sign-in. Contact support.",
+      hospital_application_pending: "Your hospital account is awaiting administrator verification.",
       account_suspended: "This account has been suspended. Contact support.",
+      account_inactive: "This account is not active. Contact support.",
       google_failed: "Google sign-in failed. Please try again.",
     };
     setError(map[err] || "Google sign-in failed. Please try again.");
   }, [params]);
-  const [modal, setModal] = React.useState<"forgot" | "google" | "otp" | null>(null);
-  const [otpNote, setOtpNote] = React.useState("");
+  const [modal, setModal] = React.useState<"forgot" | "otp" | null>(null);
+
+  React.useEffect(() => {
+    if (otpSeconds <= 0 && recoverySeconds <= 0) return;
+    const timer = window.setInterval(() => {
+      setOtpSeconds((value) => Math.max(0, value - 1));
+      setRecoverySeconds((value) => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [otpSeconds, recoverySeconds]);
+
+  function destinationForRole(accountRole: string): string {
+    if (accountRole === "HOSPITAL_ADMIN") return "/hospital";
+    if (accountRole === "SUPER_ADMIN") return "/admin";
+    return next === "/dashboard" || next === "/" ? "/dashboard" : next;
+  }
+
+  async function finishLogin(accountRole: string) {
+    if (!["PATIENT", "HOSPITAL_ADMIN", "SUPER_ADMIN"].includes(accountRole)) {
+      setError("This account is not authorised to sign in. Contact support.");
+      return;
+    }
+    await refresh();
+    router.replace(destinationForRole(accountRole));
+    router.refresh();
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -157,49 +210,160 @@ function LoginForm() {
     }
     setLoading(true);
     try {
-      // Existing authentication contract — unchanged.
       const res = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email, password, rememberMe }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
+        if (json.code === "EMAIL_VERIFICATION_REQUIRED") {
+          const query = new URLSearchParams({
+            email: json.email ?? email,
+            role: json.role ?? "PATIENT",
+            next,
+            ...(json.deliveryPending ? { delivery: "pending" } : {}),
+          });
+          router.replace(`/verify-email?${query.toString()}`);
+          return;
+        }
         setError(json.error ?? "Unable to sign in. Please try again.");
         return;
       }
-      await refresh();
-      const roleFromResp = json.data?.user?.role;
-      let dest = next;
-      if (next === "/dashboard") {
-        if (roleFromResp === "HOSPITAL_ADMIN") dest = "/hospital";
-        else if (roleFromResp === "SUPER_ADMIN") dest = "/admin";
-        else dest = "/dashboard";
-      } else if (role === "hospital" && roleFromResp === "HOSPITAL_ADMIN") {
-        dest = "/hospital";
-      } else if (role === "admin" && roleFromResp === "SUPER_ADMIN") {
-        dest = "/admin";
-      } else if (role === "patient" && roleFromResp === "PATIENT") {
-        dest = next.startsWith("/dashboard") || next === "/" ? "/dashboard" : next;
-      } else if (role === "hospital" && roleFromResp !== "HOSPITAL_ADMIN") {
-        setError("This account is not authorized for the Hospital Portal. Please select the correct portal or use an authorized Hospital Admin account.");
-        setLoading(false);
-        return;
-      } else if (role === "admin" && roleFromResp !== "SUPER_ADMIN") {
-        setError("This account is not authorized for the Admin Portal. Please select the correct portal or use a Super Admin account.");
-        setLoading(false);
-        return;
-      } else if (role === "patient" && roleFromResp !== "PATIENT") {
-        setError("This account is not authorized for the Patient Application. Please select the correct portal for your account.");
-        setLoading(false);
-        return;
-      }
-      router.replace(dest);
-      router.refresh();
+      await finishLogin(json.data?.user?.role ?? "");
     } catch {
       setError("Network problem — please check your connection and retry.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function requestEmailCode() {
+    setOtpNote("");
+    if (!role) {
+      setRoleHint(true);
+      setOtpNote("Select your account type first.");
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      const response = await fetch("/api/auth/email-code/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        setOtpNote(result.error ?? "We could not process that request.");
+        return;
+      }
+      setOtpSent(true);
+      setOtpCode("");
+      setOtpSeconds(60);
+      setOtpNote(result.data?.message ?? "If this address belongs to an eligible account, a sign-in code has been sent.");
+    } catch {
+      setOtpNote("Network problem — please check your connection and retry.");
+    } finally {
+      setOtpLoading(false);
+    }
+  }
+
+  async function verifyEmailCode() {
+    setOtpNote("");
+    setOtpLoading(true);
+    try {
+      const response = await fetch("/api/auth/email-code/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email, code: otpCode, rememberMe }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        setOtpNote(result.error ?? "That code is invalid or expired.");
+        return;
+      }
+      setModal(null);
+      await finishLogin(result.data?.user?.role ?? "");
+    } catch {
+      setOtpNote("Network problem — please check your connection and retry.");
+    } finally {
+      setOtpLoading(false);
+    }
+  }
+
+  async function requestRecoveryCode() {
+    setRecoveryError("");
+    setRecoveryLoading(true);
+    try {
+      const response = await fetch("/api/auth/password/forgot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email: recoveryEmail }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        setRecoveryError(result.error ?? "We could not process that request.");
+        return;
+      }
+      setRecoveryMessage(result.data?.message ?? "If this address belongs to an eligible account, a recovery code has been sent.");
+      setRecoveryStep("code");
+      setRecoveryCode("");
+      setRecoverySeconds(60);
+    } catch {
+      setRecoveryError("Network problem — please check your connection and retry.");
+    } finally {
+      setRecoveryLoading(false);
+    }
+  }
+
+  async function verifyRecoveryCode(event: React.FormEvent) {
+    event.preventDefault();
+    setRecoveryError("");
+    setRecoveryLoading(true);
+    try {
+      const response = await fetch("/api/auth/password/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email: recoveryEmail, code: recoveryCode }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        setRecoveryError(result.error ?? "That code is invalid or expired.");
+        return;
+      }
+      setRecoveryStep("password");
+    } catch {
+      setRecoveryError("Network problem — please check your connection and retry.");
+    } finally {
+      setRecoveryLoading(false);
+    }
+  }
+
+  async function resetPassword(event: React.FormEvent) {
+    event.preventDefault();
+    setRecoveryError("");
+    if (recoveryPassword !== recoveryConfirm) {
+      setRecoveryError("The passwords do not match.");
+      return;
+    }
+    setRecoveryLoading(true);
+    try {
+      const response = await fetch("/api/auth/password/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ password: recoveryPassword, confirmPassword: recoveryConfirm }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        setRecoveryError(result.error ?? "We could not update your password.");
+        return;
+      }
+      setRecoveryMessage(result.data?.message ?? "Your password has been updated. Sign in with your new password.");
+      setRecoveryStep("done");
+    } catch {
+      setRecoveryError("Network problem — please check your connection and retry.");
+    } finally {
+      setRecoveryLoading(false);
     }
   }
 
@@ -324,7 +488,13 @@ function LoginForm() {
               </label>
               <button
                 type="button"
-                onClick={() => setModal("forgot")}
+                onClick={() => {
+                  setRecoveryEmail(email);
+                  setRecoveryStep("email");
+                  setRecoveryError("");
+                  setRecoveryMessage("");
+                  setModal("forgot");
+                }}
                 className="text-[12.5px] font-semibold text-[#2563EB] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#062B67]"
               >
                 Forgot password?
@@ -352,6 +522,16 @@ function LoginForm() {
               </button>
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-[13px] text-[#64748B]">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(event) => setRememberMe(event.target.checked)}
+              className="h-4 w-4 rounded border-[#CBD5E1] accent-[#062B67]"
+            />
+            Keep me signed in for 7 days
+          </label>
 
           {error && (
             <p
@@ -403,7 +583,13 @@ function LoginForm() {
 
             <button
               type="button"
-              onClick={() => { setOtpNote(""); setModal("otp"); }}
+              onClick={() => {
+                setOtpNote("");
+                setOtpSent(false);
+                setOtpCode("");
+                setEmail(email);
+                setModal("otp");
+              }}
               className="mx-auto mt-3.5 block text-[13px] font-semibold text-[#2563EB] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#062B67]"
             >
               Use OTP instead
@@ -427,8 +613,11 @@ function LoginForm() {
       {modal === "forgot" && (
         <Modal labelledBy="forgot-title" onClose={() => setModal(null)}>
           <div className="flex items-start justify-between gap-3">
-            <h2 id="forgot-title" className="text-lg font-bold text-[#102A56]">Forgot Password</h2>
+            <h2 id="forgot-title" className="text-lg font-bold text-[#102A56]">
+              {recoveryStep === "done" ? "Password updated" : "Reset your password"}
+            </h2>
             <button
+              type="button"
               onClick={() => setModal(null)}
               aria-label="Close"
               className="rounded-md p-1 text-[#94A3B8] hover:text-[#102A56] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#062B67]"
@@ -437,46 +626,58 @@ function LoginForm() {
             </button>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-[#64748B]">
-            Password recovery is currently unavailable.
+            {recoveryStep === "email" && "Enter your account email. If it is registered, we will send a recovery code."}
+            {recoveryStep === "code" && (recoveryMessage || "Enter the six-digit recovery code sent to your email.")}
+            {recoveryStep === "password" && "Choose a new password with at least 12 characters, including upper-case, lower-case and numeric characters."}
+            {recoveryStep === "done" && recoveryMessage}
           </p>
-          <button
-            onClick={() => setModal(null)}
-            className="mt-5 h-10 w-full rounded-[10px] bg-[#062B67] text-sm font-bold text-white transition-colors hover:bg-[#0A377E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#062B67]"
-          >
-            Close
-          </button>
-        </Modal>
-      )}
-
-      {modal === "google" && (
-        <Modal labelledBy="google-title" onClose={() => setModal(null)}>
-          <div className="flex items-start justify-between gap-3">
-            <h2 id="google-title" className="text-lg font-bold text-[#102A56]">Google Sign-In</h2>
-            <button
-              onClick={() => setModal(null)}
-              aria-label="Close"
-              className="rounded-md p-1 text-[#94A3B8] hover:text-[#102A56] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#062B67]"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <p className="mt-3 text-sm leading-relaxed text-[#64748B]">
-            Google sign-in is currently unavailable.
-          </p>
-          <button
-            onClick={() => setModal(null)}
-            className="mt-5 h-10 w-full rounded-[10px] bg-[#062B67] text-sm font-bold text-white transition-colors hover:bg-[#0A377E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#062B67]"
-          >
-            Close
-          </button>
+          {recoveryStep === "email" && (
+            <form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); void requestRecoveryCode(); }}>
+              <label htmlFor="recovery-email" className="block text-sm font-semibold text-[#102A56]">Email address</label>
+              <input id="recovery-email" type="email" required maxLength={254} autoComplete="email" value={recoveryEmail} onChange={(event) => setRecoveryEmail(event.target.value)} className="h-11 w-full rounded-lg border border-[#D7E0EC] px-3 text-sm text-[#102A56] outline-none focus:border-[#062B67] focus:ring-2 focus:ring-[#062B67]/15" />
+              {recoveryError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{recoveryError}</p>}
+              <button type="submit" disabled={recoveryLoading} className="h-11 w-full rounded-[10px] bg-[#062B67] text-sm font-bold text-white disabled:opacity-60">
+                {recoveryLoading ? "Sending…" : "Send recovery code"}
+              </button>
+            </form>
+          )}
+          {recoveryStep === "code" && (
+            <form className="mt-4 space-y-3" onSubmit={verifyRecoveryCode}>
+              <OtpBoxes value={recoveryCode} onChange={setRecoveryCode} />
+              {recoveryError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{recoveryError}</p>}
+              <button type="submit" disabled={recoveryLoading || recoveryCode.length !== 6} className="h-11 w-full rounded-[10px] bg-[#062B67] text-sm font-bold text-white disabled:opacity-60">
+                {recoveryLoading ? "Checking…" : "Verify code"}
+              </button>
+              <button type="button" disabled={recoverySeconds > 0 || recoveryLoading} onClick={() => void requestRecoveryCode()} className="w-full text-sm font-semibold text-[#2563EB] disabled:text-slate-400">
+                {recoverySeconds > 0 ? `Resend code in ${recoverySeconds}s` : "Resend recovery code"}
+              </button>
+              <button type="button" onClick={() => { setRecoveryStep("email"); setRecoveryError(""); }} className="w-full text-xs text-[#64748B] hover:underline">Use a different email address</button>
+            </form>
+          )}
+          {recoveryStep === "password" && (
+            <form className="mt-4 space-y-3" onSubmit={resetPassword}>
+              <label htmlFor="recovery-password" className="block text-sm font-semibold text-[#102A56]">New password</label>
+              <input id="recovery-password" type="password" required minLength={12} maxLength={72} autoComplete="new-password" value={recoveryPassword} onChange={(event) => setRecoveryPassword(event.target.value)} className="h-11 w-full rounded-lg border border-[#D7E0EC] px-3 text-sm text-[#102A56] outline-none focus:border-[#062B67] focus:ring-2 focus:ring-[#062B67]/15" />
+              <label htmlFor="recovery-confirm" className="block text-sm font-semibold text-[#102A56]">Confirm new password</label>
+              <input id="recovery-confirm" type="password" required minLength={12} maxLength={72} autoComplete="new-password" value={recoveryConfirm} onChange={(event) => setRecoveryConfirm(event.target.value)} className="h-11 w-full rounded-lg border border-[#D7E0EC] px-3 text-sm text-[#102A56] outline-none focus:border-[#062B67] focus:ring-2 focus:ring-[#062B67]/15" />
+              {recoveryError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{recoveryError}</p>}
+              <button type="submit" disabled={recoveryLoading} className="h-11 w-full rounded-[10px] bg-[#062B67] text-sm font-bold text-white disabled:opacity-60">
+                {recoveryLoading ? "Updating…" : "Update password"}
+              </button>
+            </form>
+          )}
+          {recoveryStep === "done" && (
+            <button type="button" onClick={() => setModal(null)} className="mt-5 h-10 w-full rounded-[10px] bg-[#062B67] text-sm font-bold text-white transition-colors hover:bg-[#0A377E]">Return to sign in</button>
+          )}
         </Modal>
       )}
 
       {modal === "otp" && (
         <Modal labelledBy="otp-title" onClose={() => setModal(null)}>
           <div className="flex items-start justify-between gap-3">
-            <h2 id="otp-title" className="text-lg font-bold text-[#102A56]">OTP Verification</h2>
+            <h2 id="otp-title" className="text-lg font-bold text-[#102A56]">Email code sign-in</h2>
             <button
+              type="button"
               onClick={() => setModal(null)}
               aria-label="Close"
               className="rounded-md p-1 text-[#94A3B8] hover:text-[#102A56] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#062B67]"
@@ -485,28 +686,29 @@ function LoginForm() {
             </button>
           </div>
           <p className="mt-2 text-[13px] leading-relaxed text-[#64748B]">
-            Enter the 6-digit OTP sent to your registered mobile number.
+            {otpSent ? "Enter the six-digit code sent to your email address." : "We will email a one-time sign-in code to your registered account."}
           </p>
-          <div className="mt-4">
-            <OtpBoxes />
-          </div>
-          {otpNote && (
-            <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-              {otpNote}
-            </p>
-          )}
-          <button
-            onClick={() => setOtpNote("OTP verification is currently unavailable.")}
-            className="mt-5 h-11 w-full rounded-[10px] bg-[#062B67] text-sm font-bold text-white transition-colors hover:bg-[#0A377E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#062B67]"
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (otpSent) void verifyEmailCode();
+              else void requestEmailCode();
+            }}
           >
-            Verify OTP
-          </button>
-          <button
-            onClick={() => setOtpNote("Resend is currently unavailable.")}
-            className="mt-2.5 h-10 w-full rounded-[10px] border border-[#D7E0EC] bg-white text-sm font-bold text-[#102A56] transition-colors hover:bg-[#F5F8FC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#062B67]"
-          >
-            Resend OTP
-          </button>
+            <label htmlFor="otp-email" className="block text-sm font-semibold text-[#102A56]">Email address</label>
+            <input id="otp-email" type="email" required maxLength={254} autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="h-11 w-full rounded-lg border border-[#D7E0EC] px-3 text-sm text-[#102A56] outline-none focus:border-[#062B67] focus:ring-2 focus:ring-[#062B67]/15" />
+            {otpSent && <OtpBoxes value={otpCode} onChange={setOtpCode} />}
+            {otpNote && <p role="status" className="rounded-lg border border-[#D7E0EC] bg-[#F5F8FC] px-3 py-2 text-xs text-[#43536D]">{otpNote}</p>}
+            <button type="submit" disabled={otpLoading || (otpSent && otpCode.length !== 6)} className="h-11 w-full rounded-[10px] bg-[#062B67] text-sm font-bold text-white disabled:opacity-60">
+              {otpLoading ? "Please wait…" : otpSent ? "Verify and sign in" : "Send sign-in code"}
+            </button>
+            {otpSent && (
+              <button type="button" disabled={otpLoading || otpSeconds > 0} onClick={() => void requestEmailCode()} className="w-full text-sm font-semibold text-[#2563EB] disabled:text-slate-400">
+                {otpSeconds > 0 ? `Resend code in ${otpSeconds}s` : "Resend sign-in code"}
+              </button>
+            )}
+          </form>
         </Modal>
       )}
       </div>

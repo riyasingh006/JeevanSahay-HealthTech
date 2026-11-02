@@ -29,9 +29,15 @@ model User {
   emergencyRel   String?
   emergencyPhone String?
   sharePin       String? // 6-digit code controlling access to Digital Health Profile via QR
-  status         String   @default("ACTIVE") // ACTIVE | SUSPENDED
-  hospitalId     String? // set for HOSPITAL_ADMIN users
+  status         String   @default("ACTIVE") // ACTIVE | PENDING_VERIFICATION | SUSPENDED
+  emailVerifiedAt DateTime?
+  googleSubject  String?  @unique
+  authVersion    Int      @default(0)
+  hospitalId     String? // set for HOSPITAL_ADMIN users after hospital approval
   hospital       Hospital? @relation(fields: [hospitalId], references: [id])
+  hospitalApplication HospitalApplication?
+  sessions       UserSession[]
+  authOtps       AuthOtp[]
   savedHospitals SavedHospital[]
   searches       SearchRecord[]
   notifications  Notification[]
@@ -39,6 +45,60 @@ model User {
   auditLogs      AuditLog[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model UserSession {
+  id           String   @id
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authVersion  Int
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model AuthOtp {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose     String // EMAIL_VERIFICATION | PASSWORD_RESET | PASSWORDLESS_LOGIN
+  codeHash    String
+  expiresAt   DateTime
+  attempts    Int      @default(0)
+  lastSentAt  DateTime @default(now())
+  verifiedAt  DateTime?
+  consumedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, purpose])
+  @@index([expiresAt])
+}
+
+model HospitalApplication {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospitalName       String
+  registrationNumber String?
+  hospitalType       String   @default("PRIVATE")
+  addressLine        String
+  city               String
+  state              String
+  pincode            String
+  phone              String
+  email              String
+  website            String?
+  status             String   @default("PENDING_VERIFICATION")
+  reviewNote         String?
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([status, createdAt])
 }
 
 model Hospital {
