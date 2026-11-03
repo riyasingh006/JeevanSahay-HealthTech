@@ -157,7 +157,7 @@ function LoginForm() {
   const [roleHint, setRoleHint] = React.useState(false);
 
   React.useEffect(() => {
-    const err = params.get("error");
+    const err = params.get("error") ?? params.get("reason");
     if (!err) return;
     const map: Record<string, string> = {
       google_cancelled: "Google sign-in was cancelled.",
@@ -168,6 +168,7 @@ function LoginForm() {
       google_email_unverified: "Google could not verify this email address. Please use another account.",
       google_account_link_conflict: "This Google account is linked to a different sign-in. Contact support.",
       hospital_application_pending: "Your hospital account is awaiting administrator verification.",
+      "hospital-rejected": "Your hospital application was not approved. Check the decision email or contact support.",
       account_suspended: "This account has been suspended. Contact support.",
       account_inactive: "This account is not active. Contact support.",
       google_failed: "Google sign-in failed. Please try again.",

@@ -25,8 +25,8 @@ export const POST = withApi(
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
-        hospital: { select: { status: true } },
-        hospitalApplication: { select: { status: true } },
+        hospital: { select: { status: true, rejectionReason: true } },
+        hospitalApplication: { select: { status: true, reviewNote: true } },
       },
     });
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
@@ -41,7 +41,8 @@ export const POST = withApi(
     if (user.status === "SUSPENDED") {
       return fail(403, "This account has been suspended. Contact support.", { code: "ACCOUNT_SUSPENDED" });
     }
-    if (!user.emailVerifiedAt || user.status === "PENDING_VERIFICATION") {
+    const rejectedHospitalApplication = user.role === "HOSPITAL_ADMIN" && user.hospitalApplication?.status === "REJECTED";
+    if (!user.emailVerifiedAt || (user.status === "PENDING_VERIFICATION" && !rejectedHospitalApplication)) {
       const verification = await issueAuthOtp({
         userId: user.id,
         email: user.email,
@@ -63,13 +64,29 @@ export const POST = withApi(
         }
       );
     }
-    if (user.status !== "ACTIVE") {
+    if (user.status !== "ACTIVE" && !rejectedHospitalApplication) {
       return fail(403, "This account is not active. Contact support.", { code: "ACCOUNT_INACTIVE" });
+    }
+    if (user.role === "HOSPITAL_ADMIN" && user.hospitalApplication?.status === "REJECTED") {
+      return fail(403, user.hospitalApplication.reviewNote
+        ? `Your hospital application was not approved. Reason: ${user.hospitalApplication.reviewNote}`
+        : "Your hospital application was not approved. Check your email for the review reason.", {
+        code: "HOSPITAL_APPLICATION_REJECTED",
+        applicationStatus: "REJECTED",
+        reviewNote: user.hospitalApplication.reviewNote,
+      });
     }
     if (
       user.role === "HOSPITAL_ADMIN" &&
       (!user.hospitalId || user.hospital?.status !== "VERIFIED")
     ) {
+      if (user.hospitalApplication?.status === "REJECTED" || user.hospital?.status === "REJECTED") {
+        return fail(403, "Your hospital application was not approved. Contact support if you need clarification.", {
+          code: "HOSPITAL_APPLICATION_REJECTED",
+          applicationStatus: "REJECTED",
+          reviewNote: user.hospitalApplication?.reviewNote ?? user.hospital?.rejectionReason ?? null,
+        });
+      }
       return fail(403, "Your hospital application is awaiting verification.", {
         code: "HOSPITAL_APPLICATION_PENDING",
         applicationStatus: user.hospitalApplication?.status ?? "PENDING_VERIFICATION",

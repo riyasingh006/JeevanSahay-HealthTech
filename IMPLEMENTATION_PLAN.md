@@ -42,6 +42,15 @@
 - Removed fictional readiness and occupancy claims from hospital pages. Added case logging with non-identifying input guidance and truthful empty/loading/error states. Analytics use recorded appointments and emergency cases only.
 - Verified two-hospital isolation, role denial, persistence, appointment/emergency actions, patient-facing inventory updates, and itemised bed accounting through the disposable SQLite + local SMTP test harness.
 
+## Phase 4 implementation (completed)
+
+- Added a server-protected super-admin shell and overview with database-backed account, hospital, bed, specialist, emergency-search, report, review-queue, and audit metrics.
+- Added paginated/searchable hospital application and legacy-record queues, verified-email and confirmed-map checks for application approval, mandatory rejection notes, transactional account/hospital linking, notifications, audit events, and SMTP decision emails with explicit delivery status.
+- Added a filtered account directory with suspend/reactivate only (no role promotion), last-admin/self-suspension safeguards, session revocation and audit logging.
+- Added filtered/paginated report review with validated transitions, required closure notes, concurrency protection and audit events; added read-only filtered/date-bounded audit browsing and current-page CSV exports with spreadsheet-formula protection.
+- Added responsive admin navigation/screens while preserving the existing patient and hospital UI. Updated rejected-applicant login messaging to show the recorded decision reason without issuing a session.
+- Verification: 23 disposable-database/local-SMTP integration checks pass, including admin role denial, application approval/rejection and notifications/email, report resolution, account session revocation, filtered exports' API scopes, and cross-portal protections. `npm run typecheck`, `npx prisma validate`, and the production build pass. `npm run lint` reports 11 pre-existing unused-variable warnings and no errors. Desktop and mobile admin screens and the report resolution interaction were checked against a temporary production server/database; both were removed afterward. No user database was migrated or seeded.
+
 ## Current status
 
 - Phase 0 inspection and implementation plan: complete.
@@ -50,4 +59,5 @@
 - Phase 1/2 verification: the disposable-database/local-SMTP integration suite passes; `npm run typecheck` passes; `npm run lint` succeeds with existing unused-variable warnings; Prisma validation and production build pass. No user database was seeded or migrated. Production Google and SMTP delivery still require the owner’s credentials.
 - Phase 3 Hospital Portal: implementation and verification complete. Replaced the in-memory demo provider with verified-hospital-scoped database loading and mutations across dashboard, beds, doctors, departments, appointments, emergency cases, services, profile, settings, notifications, and analytics. Existing page layout was retained; fake capacity/readiness figures were removed; itemised beds update patient-facing aggregates transactionally; appointment and emergency status changes are validated; writes are audited and isolated by hospital.
 - Phase 3 verification: 17 disposable-database/local-SMTP integration checks pass, including cross-hospital isolation, patient-facing bed/service updates, appointment workflows, emergency records, settings/profile persistence, and role denials. `npm run typecheck`, `npm run lint` (11 existing warnings), `prisma validate`, and the production build pass. No real database was seeded or migrated.
-- Next: Phase 4 adds the admin interface for hospital verification/rejection, account management, complaints/reports, analytics, exports, and audit review. Hospital applications remain pending and cannot access the portal until that approval workflow exists.
+- Phase 4 Admin Portal: complete and verified. The pending-application workflow now enables verified hospital admins to enter their own scoped portal only after approval; rejection remains session-free and displays its recorded reason.
+- Next: Phase 5 reconciles the existing schema, adds versioned production migrations and safe upgrade/backfill procedures. No production migration or real database change has been attempted.

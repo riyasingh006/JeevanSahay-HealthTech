@@ -604,6 +604,269 @@ async function main() {
   const adminLogin = await request("/api/auth/login", "POST", { email: adminEmail, password: adminPassword });
   assert.equal(adminLogin.response.status, 200, JSON.stringify(adminLogin.json));
   const adminCookie = cookieFrom(adminLogin.response, "js_session");
+
+  const adminStats = await request("/api/admin/stats", "GET", undefined, adminCookie);
+  assert.equal(adminStats.response.status, 200, JSON.stringify(adminStats.json));
+  assert.ok(typeof adminStats.json.data.stats.pendingHospitals === "number");
+  assert.ok(Array.isArray(adminStats.json.data.queue));
+  const patientAdminStats = await request("/api/admin/stats", "GET", undefined, patientSessionCookie);
+  assert.equal(patientAdminStats.response.status, 403);
+  const patientAdminPage = await fetch(`${baseUrl}/admin`, { headers: { Cookie: patientSessionCookie }, redirect: "manual" });
+  assert.equal(patientAdminPage.status, 307);
+  console.log("PASS admin pages and administrative summaries reject non-admin sessions");
+
+  const pendingApplication = await prisma.hospitalApplication.findUniqueOrThrow({ where: { userId: hospitalUser.id } });
+  const adminApplicationList = await request("/api/admin/applications?status=all&page=1&pageSize=10", "GET", undefined, adminCookie);
+  assert.equal(adminApplicationList.response.status, 200, JSON.stringify(adminApplicationList.json));
+  assert.ok(adminApplicationList.json.data.applications.some((item: { id: string }) => item.id === pendingApplication.id));
+  const approvalWithoutLocation = await request("/api/admin/applications", "POST", {
+    applicationId: pendingApplication.id,
+    decision: "VERIFIED",
+  }, adminCookie);
+  assert.equal(approvalWithoutLocation.response.status, 422);
+  assert.equal((await prisma.hospitalApplication.findUniqueOrThrow({ where: { id: pendingApplication.id } })).status, "PENDING_VERIFICATION");
+  const approvalEmailCount = mailCount(hospitalEmail);
+  const applicationApproval = await request("/api/admin/applications", "POST", {
+    applicationId: pendingApplication.id,
+    decision: "VERIFIED",
+    lat: 28.6139,
+    lng: 77.209,
+  }, adminCookie);
+  assert.equal(applicationApproval.response.status, 200, JSON.stringify(applicationApproval.json));
+  assert.equal(applicationApproval.json.data.emailSent, true);
+  assert.equal(mailCount(hospitalEmail), approvalEmailCount + 1);
+  const approvedApplicant = await prisma.user.findUniqueOrThrow({ where: { id: hospitalUser.id } });
+  assert.equal(approvedApplicant.status, "ACTIVE");
+  assert.ok(approvedApplicant.hospitalId);
+  const approvedHospital = await prisma.hospital.findUniqueOrThrow({ where: { id: approvedApplicant.hospitalId! } });
+  assert.equal(approvedHospital.status, "VERIFIED");
+  assert.equal(approvedHospital.lat, 28.6139);
+  assert.equal((await prisma.auditLog.findFirst({ where: { entityId: pendingApplication.id, action: "HOSPITAL_APPLICATION_VERIFIED" } }))?.entityId, pendingApplication.id);
+  const approvedLogin = await request("/api/auth/login", "POST", { email: hospitalEmail, password: strongPassword });
+  assert.equal(approvedLogin.response.status, 200, JSON.stringify(approvedLogin.json));
+  const approvedHospitalCookie = cookieFrom(approvedLogin.response, "js_session");
+  const approvedPortal = await request("/api/hospital/portal", "GET", undefined, approvedHospitalCookie);
+  assert.equal(approvedPortal.response.status, 200);
+  assert.equal(approvedPortal.json.data.hospital.id, approvedHospital.id);
+  const duplicateApplicationReview = await request("/api/admin/applications", "POST", {
+    applicationId: pendingApplication.id,
+    decision: "VERIFIED",
+    lat: 28.6139,
+    lng: 77.209,
+  }, adminCookie);
+  assert.equal(duplicateApplicationReview.response.status, 409);
+  console.log("PASS hospital approval atomically verifies and links the account, records audit, emails, and unlocks the scoped portal");
+
+  const rejectedEmail = testEmail("hospital-rejected");
+  const rejectedRegister = await request("/api/auth/register", "POST", {
+    name: "Rejected Hospital Applicant",
+    email: rejectedEmail,
+    phone: "+91 9810098766",
+    password: strongPassword,
+    role: "HOSPITAL_ADMIN",
+    hospitalName: "Rejected Test Hospital",
+    registrationNumber: "TEST-REG-REJECT-2941",
+    hospitalType: "PRIVATE",
+    addressLine: "43 Test Medical Road",
+    city: "New Delhi",
+    state: "Delhi",
+    pincode: "110001",
+  });
+  assert.equal(rejectedRegister.response.status, 201, JSON.stringify(rejectedRegister.json));
+  const rejectedUser = await prisma.user.findUniqueOrThrow({ where: { email: rejectedEmail } });
+  const rejectedApplication = await prisma.hospitalApplication.findUniqueOrThrow({ where: { userId: rejectedUser.id } });
+  const rejectedVerified = await request("/api/auth/verify-email", "POST", { email: rejectedEmail, code: codeFor(rejectedEmail) });
+  assert.equal(rejectedVerified.response.status, 200);
+  const missingRejectionReason = await request("/api/admin/applications", "POST", {
+    applicationId: rejectedApplication.id,
+    decision: "REJECTED",
+  }, adminCookie);
+  assert.equal(missingRejectionReason.response.status, 422);
+  const decisionReason = "Registration documents could not be verified.";
+  const applicationRejection = await request("/api/admin/applications", "POST", {
+    applicationId: rejectedApplication.id,
+    decision: "REJECTED",
+    reason: decisionReason,
+  }, adminCookie);
+  assert.equal(applicationRejection.response.status, 200, JSON.stringify(applicationRejection.json));
+  assert.equal(applicationRejection.json.data.emailSent, true);
+  const rejectedLogin = await request("/api/auth/login", "POST", { email: rejectedEmail, password: strongPassword });
+  assert.equal(rejectedLogin.response.status, 403);
+  assert.equal(rejectedLogin.json.code, "HOSPITAL_APPLICATION_REJECTED");
+  assert.equal(rejectedLogin.json.reviewNote, decisionReason);
+  assert.ok(!rejectedLogin.response.headers.getSetCookie().some((cookie) => cookie.startsWith("js_session=")));
+  console.log("PASS hospital rejection requires a reason, notifies the applicant, and never grants portal access");
+
+  const legacyHospital = await prisma.hospital.create({
+    data: {
+      name: "Legacy Test Hospital",
+      type: "PRIVATE",
+      status: "PENDING_VERIFICATION",
+      registrationNumber: `LEGACY-${randomBytes(4).toString("hex")}`,
+      addressLine: "44 Test Medical Road",
+      city: "New Delhi",
+      state: "Delhi",
+      pincode: "110001",
+      phone: "+91 9810098768",
+      lat: 28.6139,
+      lng: 77.209,
+    },
+  });
+  const legacyAdminEmail = testEmail("legacy-hospital-admin");
+  const legacyAdmin = await prisma.user.create({
+    data: {
+      name: "Legacy Hospital Administrator",
+      email: legacyAdminEmail,
+      passwordHash: await bcrypt.hash(strongPassword, 12),
+      role: "HOSPITAL_ADMIN",
+      status: "PENDING_VERIFICATION",
+      emailVerifiedAt: new Date(),
+      hospitalId: legacyHospital.id,
+    },
+  });
+  const legacyApproval = await request("/api/admin/hospitals", "POST", {
+    hospitalId: legacyHospital.id,
+    decision: "VERIFIED",
+  }, adminCookie);
+  assert.equal(legacyApproval.response.status, 200, JSON.stringify(legacyApproval.json));
+  const activatedLegacyAdmin = await prisma.user.findUniqueOrThrow({ where: { id: legacyAdmin.id } });
+  assert.equal(activatedLegacyAdmin.status, "ACTIVE");
+  assert.equal(activatedLegacyAdmin.authVersion, legacyAdmin.authVersion + 1);
+  assert.ok((await prisma.hospital.findUniqueOrThrow({ where: { id: legacyHospital.id } })).verifiedAt);
+  assert.ok(await prisma.notification.findFirst({ where: { userId: legacyAdmin.id, title: "Hospital verified" } }));
+  const legacyAdminLogin = await request("/api/auth/login", "POST", { email: legacyAdminEmail, password: strongPassword });
+  assert.equal(legacyAdminLogin.response.status, 200, JSON.stringify(legacyAdminLogin.json));
+  const legacyAdminCookie = cookieFrom(legacyAdminLogin.response, "js_session");
+  const legacyPortal = await request("/api/hospital/portal", "GET", undefined, legacyAdminCookie);
+  assert.equal(legacyPortal.response.status, 200);
+  assert.equal(legacyPortal.json.data.hospital.id, legacyHospital.id);
+
+  const legacyRejectHospital = await prisma.hospital.create({
+    data: {
+      name: "Legacy Rejection Test Hospital",
+      type: "PRIVATE",
+      status: "VERIFIED",
+      verifiedAt: new Date(),
+      verifiedBy: "prior-review",
+      registrationNumber: `LEGACY-REJECT-${randomBytes(4).toString("hex")}`,
+      addressLine: "45 Test Medical Road",
+      city: "New Delhi",
+      state: "Delhi",
+      pincode: "110001",
+      phone: "+91 9810098769",
+      lat: 28.614,
+      lng: 77.21,
+    },
+  });
+  const legacyRejectEmail = testEmail("legacy-hospital-rejected");
+  const legacyRejectAdmin = await prisma.user.create({
+    data: {
+      name: "Legacy Rejection Administrator",
+      email: legacyRejectEmail,
+      passwordHash: await bcrypt.hash(strongPassword, 12),
+      role: "HOSPITAL_ADMIN",
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+      hospitalId: legacyRejectHospital.id,
+    },
+  });
+  const legacyRejectLogin = await request("/api/auth/login", "POST", { email: legacyRejectEmail, password: strongPassword });
+  assert.equal(legacyRejectLogin.response.status, 200);
+  const legacyRejectCookie = cookieFrom(legacyRejectLogin.response, "js_session");
+  await prisma.hospital.update({ where: { id: legacyRejectHospital.id }, data: { status: "PENDING_VERIFICATION" } });
+  const legacyRejection = await request("/api/admin/hospitals", "POST", {
+    hospitalId: legacyRejectHospital.id,
+    decision: "REJECTED",
+    reason: "Verification documents are incomplete.",
+  }, adminCookie);
+  assert.equal(legacyRejection.response.status, 200, JSON.stringify(legacyRejection.json));
+  assert.equal((await request("/api/auth/me", "GET", undefined, legacyRejectCookie)).json.data.user, null);
+  assert.equal((await prisma.hospital.findUniqueOrThrow({ where: { id: legacyRejectHospital.id } })).verifiedAt, null);
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: legacyRejectAdmin.id } })).authVersion, legacyRejectAdmin.authVersion + 1);
+  console.log("PASS legacy hospital verification activates only verified, non-suspended admins and revokes sessions on decision");
+
+  const report = await prisma.report.create({
+    data: {
+      category: "DATA_ISSUE",
+      subject: "Admin integration test report",
+      message: "This report tests the administrative review queue and audited resolution workflow.",
+      reporterName: "Test Reporter",
+      contactEmail: testEmail("reporter"),
+      relatedHospital: "Test General Hospital",
+    },
+  });
+  const reportList = await request("/api/admin/reports?status=ALL&q=Admin%20integration", "GET", undefined, adminCookie);
+  assert.equal(reportList.response.status, 200, JSON.stringify(reportList.json));
+  assert.ok(reportList.json.data.reports.some((item: { id: string }) => item.id === report.id));
+  const patientReportsDenied = await request("/api/admin/reports?status=ALL", "GET", undefined, patientSessionCookie);
+  assert.equal(patientReportsDenied.response.status, 403);
+  const closeWithoutNote = await request("/api/admin/reports", "PATCH", {
+    reportId: report.id,
+    expectedStatus: "OPEN",
+    status: "RESOLVED",
+  }, adminCookie);
+  assert.equal(closeWithoutNote.response.status, 422);
+  const markInReview = await request("/api/admin/reports", "PATCH", {
+    reportId: report.id,
+    expectedStatus: "OPEN",
+    status: "IN_REVIEW",
+  }, adminCookie);
+  assert.equal(markInReview.response.status, 200, JSON.stringify(markInReview.json));
+  const staleReportUpdate = await request("/api/admin/reports", "PATCH", {
+    reportId: report.id,
+    expectedStatus: "OPEN",
+    status: "RESOLVED",
+    resolutionNote: "Resolved after review.",
+  }, adminCookie);
+  assert.equal(staleReportUpdate.response.status, 409);
+  const resolveReport = await request("/api/admin/reports", "PATCH", {
+    reportId: report.id,
+    expectedStatus: "IN_REVIEW",
+    status: "RESOLVED",
+    resolutionNote: "Corrected the hospital directory listing.",
+  }, adminCookie);
+  assert.equal(resolveReport.response.status, 200, JSON.stringify(resolveReport.json));
+  assert.equal(resolveReport.json.data.report.status, "RESOLVED");
+  const reportAuditEntries = await request(`/api/admin/audit?action=REPORT_STATUS_CHANGED&q=${encodeURIComponent(report.id)}`, "GET", undefined, adminCookie);
+  assert.equal(reportAuditEntries.response.status, 200, JSON.stringify(reportAuditEntries.json));
+  assert.ok(reportAuditEntries.json.data.total >= 2);
+  console.log("PASS reports support scoped search, validated state transitions, required resolution notes, concurrency checks, and audit review");
+
+  const managedEmail = testEmail("managed-account");
+  const managedPassword = "TestOnly!Managed123456";
+  const managedUser = await prisma.user.create({
+    data: {
+      name: "Managed Patient Account",
+      email: managedEmail,
+      phone: "+91 9810098767",
+      passwordHash: await bcrypt.hash(managedPassword, 12),
+      role: "PATIENT",
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+    },
+  });
+  const managedLogin = await request("/api/auth/login", "POST", { email: managedEmail, password: managedPassword });
+  assert.equal(managedLogin.response.status, 200, JSON.stringify(managedLogin.json));
+  const managedCookie = cookieFrom(managedLogin.response, "js_session");
+  const illegalRoleChange = await request("/api/admin/users", "PATCH", {
+    userId: managedUser.id,
+    status: "ACTIVE",
+    role: "SUPER_ADMIN",
+  }, adminCookie);
+  assert.equal(illegalRoleChange.response.status, 422);
+  const suspendManagedUser = await request("/api/admin/users", "PATCH", { userId: managedUser.id, status: "SUSPENDED" }, adminCookie);
+  assert.equal(suspendManagedUser.response.status, 200, JSON.stringify(suspendManagedUser.json));
+  const oldManagedSession = await request("/api/auth/me", "GET", undefined, managedCookie);
+  assert.equal(oldManagedSession.json.data.user, null);
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: managedUser.id } })).authVersion, managedUser.authVersion + 1);
+  const reactivateManagedUser = await request("/api/admin/users", "PATCH", { userId: managedUser.id, status: "ACTIVE" }, adminCookie);
+  assert.equal(reactivateManagedUser.response.status, 200, JSON.stringify(reactivateManagedUser.json));
+  const managedUsers = await request("/api/admin/users?page=1&pageSize=10&q=managed-account&role=PATIENT&status=ACTIVE", "GET", undefined, adminCookie);
+  assert.equal(managedUsers.response.status, 200, JSON.stringify(managedUsers.json));
+  assert.ok(managedUsers.json.data.users.some((item: { id: string; passwordHash?: string }) => item.id === managedUser.id && item.passwordHash === undefined));
+  const suspendSelf = await request("/api/admin/users", "PATCH", { userId: adminRecord.id, status: "SUSPENDED" }, adminCookie);
+  assert.equal(suspendSelf.response.status, 422);
+  console.log("PASS account filters, restricted status changes, session revocation, self-protection, and audit records");
   const verifiedHospitalLogin = await request("/api/auth/login", "POST", { email: hospitalAdminEmail, password: hospitalAdminPassword });
   const secondHospitalLogin = await request("/api/auth/login", "POST", { email: secondHospitalAdminEmail, password: hospitalAdminPassword });
   assert.equal(verifiedHospitalLogin.response.status, 200, JSON.stringify(verifiedHospitalLogin.json));

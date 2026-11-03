@@ -72,3 +72,33 @@ export async function sendAuthOtpEmail(input: {
     html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#16202e"><h2 style="color:#173b70">Jeevan Sahay</h2><p>Hello ${name},</p><p>Use this code to ${purpose.action}:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px;color:#173b70">${input.code}</p><p>This code expires in 5 minutes. If you did not request it, you can ignore this email.</p></div>`,
   });
 }
+
+export async function sendHospitalApplicationDecisionEmail(input: {
+  to: string;
+  name: string;
+  hospitalName: string;
+  decision: "VERIFIED" | "REJECTED";
+  reason?: string;
+}): Promise<void> {
+  const config = smtpConfig();
+  const approved = input.decision === "VERIFIED";
+  const recipient = escapeHtml(input.name || "there");
+  const hospital = escapeHtml(input.hospitalName);
+  const reason = escapeHtml(input.reason || "No additional details were provided.");
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const link = approved ? `${appUrl.replace(/\/$/, "")}/hospital` : `${appUrl.replace(/\/$/, "")}/login?reason=hospital-rejected`;
+  const subject = approved ? "Hospital application approved — Jeevan Sahay" : "Hospital application decision — Jeevan Sahay";
+  const text = approved
+    ? `Hello ${input.name || "there"},\n\nYour application for ${input.hospitalName} has been approved. Sign in to the Hospital Portal: ${link}\n\nJeevan Sahay`
+    : `Hello ${input.name || "there"},\n\nYour application for ${input.hospitalName} was not approved. Reason: ${input.reason || "No additional details were provided."}\n\nYou may contact support if you believe this decision needs review.\n\nJeevan Sahay`;
+  const body = approved
+    ? `<p>Your application for <strong>${hospital}</strong> has been approved.</p><p><a href="${escapeHtml(link)}">Open the Hospital Portal</a></p>`
+    : `<p>Your application for <strong>${hospital}</strong> was not approved.</p><p><strong>Reason:</strong> ${reason}</p><p>You may contact support if you believe this decision needs review.</p>`;
+  await nodemailer.createTransport(config).sendMail({
+    from: process.env.SMTP_FROM,
+    to: input.to,
+    subject,
+    text,
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#16202e"><h2 style="color:#173b70">Jeevan Sahay</h2><p>Hello ${recipient},</p>${body}</div>`,
+  });
+}

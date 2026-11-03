@@ -8,7 +8,9 @@ A Next.js healthcare-directory application with patient, hospital and super-admi
 - Patient portal: private profile, hospital search, saved hospitals, appointment requests/cancellation and PIN-protected health sharing.
 - Hospital portal: verified-hospital-only dashboard, bed inventory, departments, doctors, services, appointment handling, emergency case log, profile, notifications, settings and persisted analytics.
 - Hospital updates to itemised beds update the patient-facing availability aggregates transactionally. Hospital accounts cannot read or modify another hospital's records.
-- Admin verification/account-management UI and versioned production migrations remain in later implementation phases. Do not treat an unapproved hospital application as an active portal account.
+- Admin portal: protected overview and analytics, hospital application verification/rejection, searchable account suspension/reactivation, report triage, CSV exports and read-only audit review. Admin actions are role-checked, audited and session-revoking where appropriate.
+- Hospital applicants remain pending until a super-admin approves them; approval/rejection is transactional, creates an in-app notification and sends an email when SMTP is configured. Approvals require verified email and confirmed map coordinates.
+- Versioned production migrations remain a later implementation phase; do not treat `db:push` as a production migration strategy.
 
 ## Local setup
 
@@ -49,4 +51,4 @@ npm run test:auth
 npm run build
 ```
 
-`npm run test:auth` creates a disposable SQLite database and local SMTP capture server. It covers authentication, OTP limits/expiry, role access, hospital tenant isolation, patient-visible bed/service updates, appointments, emergency records, profile/settings, audit and session revocation. It does not send real email or call Google. ESLint currently reports 11 unused-variable warnings in pre-existing hospital cards, detail tabs, landing, badge and scoring files; there are no lint errors.
+`npm run test:auth` creates a disposable SQLite database and local SMTP capture server. It covers authentication, OTP limits/expiry, role access, hospital tenant isolation, patient-visible bed/service updates, appointments, emergency records, profile/settings, hospital approval/rejection, admin account/session controls, report workflows and audit logging. It does not send real email or call Google. ESLint currently reports 11 unused-variable warnings in pre-existing hospital cards, detail tabs, landing, badge and scoring files; there are no lint errors.
