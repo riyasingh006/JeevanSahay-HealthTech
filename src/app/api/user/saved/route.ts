@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
 
 export const GET = withApi(async () => {
-  const session = await requireSession();
+  const session = await requireRole("PATIENT");
   const saved = await prisma.savedHospital.findMany({
-    where: { userId: session.sub },
+    where: { userId: session.sub, hospital: { is: { status: "VERIFIED" } } },
     include: {
       hospital: {
         select: {
@@ -29,7 +29,7 @@ export const GET = withApi(async () => {
 
 export const POST = withApi(
   async (req) => {
-    const session = await requireSession();
+    const session = await requireRole("PATIENT");
     const schema = z.object({ hospitalId: z.string().min(1) });
     const parsed = await parseBody(req, schema);
     if (parsed.error) return parsed.error;
@@ -57,7 +57,7 @@ export const POST = withApi(
 
 export const DELETE = withApi(
   async (req) => {
-    const session = await requireSession();
+    const session = await requireRole("PATIENT");
     const url = new URL(req.url);
     const hospitalId = url.searchParams.get("hospitalId") ?? "";
     if (!hospitalId) return fail(400, "hospitalId is required.");

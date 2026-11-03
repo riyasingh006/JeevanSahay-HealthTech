@@ -20,7 +20,6 @@ function VerifyEmailForm() {
   const { refresh } = useAuth();
   const [email, setEmail] = React.useState(params.get("email") ?? "");
   const [code, setCode] = React.useState("");
-  const [role] = React.useState(params.get("role") === "HOSPITAL_ADMIN" ? "HOSPITAL_ADMIN" : "PATIENT");
   const [next] = React.useState(safeNext(params.get("next")));
   const [seconds, setSeconds] = React.useState(params.get("delivery") === "pending" ? 0 : 60);
   const [loading, setLoading] = React.useState(false);

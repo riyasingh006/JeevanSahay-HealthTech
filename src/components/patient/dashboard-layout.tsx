@@ -9,6 +9,7 @@ import {
   BellRing,
   Building2,
   CalendarCheck,
+  CalendarDays,
   CircleHelp,
   ClipboardPlus,
   HeartPulse,
@@ -85,6 +86,7 @@ const NAV_MAIN: NavItem[] = [
 const NAV_PATIENT: NavItem[] = [
   { href: "/dashboard/emergency", label: "Emergency Mode", icon: Siren, tone: "emergency" },
   { href: "/dashboard/saved", label: "Saved Hospitals", icon: CalendarCheck },
+  { href: "/dashboard/appointments", label: "My Appointments", icon: CalendarDays },
   { href: "/dashboard/profile", label: "Medical Profile", icon: UserRound },
   { href: "/dashboard/notifications", label: "Notifications", icon: BellRing },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

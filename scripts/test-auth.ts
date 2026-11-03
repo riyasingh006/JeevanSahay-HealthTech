@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -132,6 +133,16 @@ function codeFor(email: string): string {
 
 function testEmail(label: string): string {
   return `${label}-${randomBytes(4).toString("hex")}@example.test`;
+}
+function futureDateInIndia(): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(Date.now() + 36 * 60 * 60_000));
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
 async function registerPatient(email: string, password: string) {
@@ -285,6 +296,13 @@ async function main() {
   const patientCookie = cookieFrom(verified.response, "js_session");
   const me = await request("/api/auth/me", "GET", undefined, patientCookie);
   assert.equal(me.json.data.user.email, patientEmail);
+  const patientSearch = await request("/api/hospitals/search?q=cardiologist&limit=4", "GET", undefined, patientCookie);
+  assert.equal(patientSearch.response.status, 200);
+  const patientRecord = await prisma.user.findUniqueOrThrow({ where: { email: patientEmail } });
+  const searchHistory = await prisma.searchRecord.findMany({ where: { userId: patientRecord.id } });
+  assert.equal(searchHistory.length, 1);
+  assert.equal(searchHistory[0].query, "cardiologist");
+  assert.equal(searchHistory[0].mode, "SEARCH");
   const unauthorized = await request("/api/admin/users", "GET", undefined, patientCookie);
   assert.equal(unauthorized.response.status, 403);
   const wrongPortal = await request("/hospital", "GET", undefined, patientCookie);
@@ -336,6 +354,108 @@ async function main() {
   const newLogin = await request("/api/auth/login", "POST", { email: patientEmail, password: "Replacement!Password456" });
   assert.equal(newLogin.response.status, 200);
   console.log("PASS password recovery checks confirmation and revokes every prior session");
+
+  const patientSessionCookie = cookieFrom(newLogin.response, "js_session");
+  const profileUpdate = await request("/api/user/profile", "PATCH", {
+    name: "Updated Test Patient",
+    age: 41,
+    conditions: "Controlled hypertension",
+    role: "SUPER_ADMIN",
+  }, patientSessionCookie);
+  assert.equal(profileUpdate.response.status, 200);
+  const updatedPatient = await prisma.user.findUniqueOrThrow({ where: { email: patientEmail } });
+  assert.equal(updatedPatient.role, "PATIENT");
+  assert.equal(updatedPatient.age, 41);
+  const profileBeforeShare = await request("/api/user/profile", "GET", undefined, patientSessionCookie);
+  assert.equal(profileBeforeShare.json.data.profile.hasSharePin, false);
+  const pinUpdate = await request("/api/user/profile", "PUT", {
+    currentPassword: "Replacement!Password456",
+    newPin: "482913",
+  }, patientSessionCookie);
+  assert.equal(pinUpdate.response.status, 200);
+  const shareTokenResponse = await request("/api/user/health-share", "POST", undefined, patientSessionCookie);
+  assert.equal(shareTokenResponse.response.status, 200);
+  const shareQuery = new URLSearchParams({ token: shareTokenResponse.json.data.token, pin: "482913" });
+  const sharedProfile = await request(`/api/user/health-share?${shareQuery.toString()}`);
+  assert.equal(sharedProfile.response.status, 200);
+  assert.equal(sharedProfile.json.data.summary.conditions, "Controlled hypertension");
+  assert.equal("email" in sharedProfile.json.data.summary, false);
+  console.log("PASS patient profile updates stay scoped and health sharing requires a PIN");
+  const appointmentHospital = await prisma.hospital.create({
+    data: {
+      name: "Appointments Test Hospital",
+      type: "PRIVATE",
+      status: "VERIFIED",
+      registrationNumber: "TEST-APPOINTMENT-HOSPITAL",
+      addressLine: "1 Test Health Road",
+      city: "New Delhi",
+      state: "Delhi",
+      pincode: "110001",
+      phone: "+91 1100011000",
+      lat: 28.6139,
+      lng: 77.2090,
+    },
+  });
+  const appointmentDoctor = await prisma.doctor.create({
+    data: {
+      hospitalId: appointmentHospital.id,
+      name: "Dr. Test Specialist",
+      specialty: "CARDIOLOGY",
+      department: "Cardiology",
+      availability: "AVAILABLE",
+    },
+  });
+  const appointmentDate = futureDateInIndia();
+  const requested = await request("/api/appointments", "POST", {
+    hospitalId: appointmentHospital.id,
+    doctorId: appointmentDoctor.id,
+    patientName: "Test Patient",
+    patientPhone: "+91 9810012345",
+    date: appointmentDate,
+    time: "11:30 AM",
+  }, patientSessionCookie);
+  assert.equal(requested.response.status, 201, JSON.stringify(requested.json));
+  const appointmentId = requested.json.data.appointment.id as string;
+  assert.equal(requested.json.data.appointment.status, "REQUESTED");
+  const appointmentRecord = await prisma.appointment.findUniqueOrThrow({ where: { id: appointmentId } });
+  assert.equal(appointmentRecord.patientId, (await prisma.user.findUniqueOrThrow({ where: { email: patientEmail } })).id);
+  assert.equal(appointmentRecord.patientEmail, patientEmail);
+  const savedHospital = await request("/api/user/saved", "POST", { hospitalId: appointmentHospital.id }, patientSessionCookie);
+  assert.equal(savedHospital.response.status, 200);
+  const savedList = await request("/api/user/saved", "GET", undefined, patientSessionCookie);
+  assert.ok(savedList.json.data.saved.some((item: { hospitalId: string }) => item.hospitalId === appointmentHospital.id));
+  const unsavedHospital = await request(`/api/user/saved?hospitalId=${encodeURIComponent(appointmentHospital.id)}`, "DELETE", undefined, patientSessionCookie);
+  assert.equal(unsavedHospital.response.status, 200);
+
+
+  const otherPatientEmail = testEmail("other-patient");
+  await prisma.user.create({
+    data: {
+      name: "Another Patient",
+      email: otherPatientEmail,
+      passwordHash: await bcrypt.hash(strongPassword, 12),
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+    },
+  });
+  const otherLogin = await request("/api/auth/login", "POST", { email: otherPatientEmail, password: strongPassword });
+  assert.equal(otherLogin.response.status, 200);
+  const otherCookie = cookieFrom(otherLogin.response, "js_session");
+  const otherAppointments = await request("/api/appointments", "GET", undefined, otherCookie);
+  assert.equal(otherAppointments.response.status, 200);
+  assert.equal(otherAppointments.json.data.appointments.length, 0);
+  const unauthorizedCancel = await request("/api/appointments", "PATCH", { appointmentId }, otherCookie);
+  assert.equal(unauthorizedCancel.response.status, 409);
+  assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: appointmentId } })).status, "REQUESTED");
+
+  const ownAppointments = await request("/api/appointments", "GET", undefined, patientSessionCookie);
+  assert.equal(ownAppointments.response.status, 200);
+  assert.equal(ownAppointments.json.data.appointments.length, 1);
+  assert.equal(ownAppointments.json.data.appointments[0].hospital.name, appointmentHospital.name);
+  const cancelledAppointment = await request("/api/appointments", "PATCH", { appointmentId }, patientSessionCookie);
+  assert.equal(cancelledAppointment.response.status, 200, JSON.stringify(cancelledAppointment.json));
+  assert.equal((await prisma.appointment.findUniqueOrThrow({ where: { id: appointmentId } })).status, "CANCELLED");
+  console.log("PASS appointment requests persist with India time, remain patient-scoped, and cancel safely");
 
   const otpEmail = testEmail("passwordless");
   await registerPatient(otpEmail, strongPassword);
@@ -421,6 +541,34 @@ async function main() {
   const adminCookie = cookieFrom(adminLogin.response, "js_session");
   const adminAccess = await request("/api/admin/users", "GET", undefined, adminCookie);
   assert.equal(adminAccess.response.status, 200);
+  const patientProfileDenied = await request("/api/user/profile", "GET", undefined, adminCookie);
+  assert.equal(patientProfileDenied.response.status, 403);
+  const patientDashboardDenied = await request("/api/dashboard", "GET", undefined, adminCookie);
+  assert.equal(patientDashboardDenied.response.status, 403);
+  const patientAppointmentsDenied = await request("/api/appointments", "GET", undefined, adminCookie);
+  assert.equal(patientAppointmentsDenied.response.status, 403);
+  const patientSavedDenied = await request("/api/user/saved", "GET", undefined, adminCookie);
+  assert.equal(patientSavedDenied.response.status, 403);
+  const patientNotificationsDenied = await request("/api/notifications", "GET", undefined, adminCookie);
+  assert.equal(patientNotificationsDenied.response.status, 403);
+  const patientRecommendationsDenied = await request("/api/patient/recommend", "POST", { need: "Find a cardiologist" }, adminCookie);
+  assert.equal(patientRecommendationsDenied.response.status, 403);
+  const patientOnlyChecks = await Promise.all([
+    request("/api/dashboard", "GET", undefined, adminCookie),
+    request("/api/user/profile", "GET", undefined, adminCookie),
+    request("/api/user/saved", "GET", undefined, adminCookie),
+    request("/api/notifications", "GET", undefined, adminCookie),
+    request("/api/user/health-share", "POST", {}, adminCookie),
+    request("/api/patient/recommend", "POST", { need: "Find a cardiologist near New Delhi" }, adminCookie),
+  ]);
+  assert.ok(patientOnlyChecks.every((item) => item.response.status === 403));
+  for (const pathname of ["/api/user/profile", "/api/user/saved", "/api/notifications", "/api/appointments"]) {
+    const denied = await request(pathname, "GET", undefined, adminCookie);
+    assert.equal(denied.response.status, 403, `Expected patient-only access denial for ${pathname}`);
+  }
+  const deniedRecommendation = await request("/api/patient/recommend", "POST", { need: "Find a cardiologist near me" }, adminCookie);
+  assert.equal(deniedRecommendation.response.status, 403);
+  console.log("PASS super-admin sessions cannot call patient-only data APIs");
   console.log("PASS protected admin provisioning creates a verified admin without role promotion");
 
   const oauthStart = await fetch(`${baseUrl}/api/auth/google`, { redirect: "manual" });

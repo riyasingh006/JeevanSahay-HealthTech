@@ -1,6 +1,6 @@
 ﻿import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { fail, idFromUrl, ok, parseBody, withApi } from "@/lib/api-helpers";
 
 export const GET = withApi(
@@ -19,7 +19,7 @@ export const GET = withApi(
 
 export const POST = withApi(
   async (req) => {
-    const session = await requireSession();
+    const session = await requireRole("PATIENT");
     const hospitalId = idFromUrl(req);
     if (!hospitalId) return fail(400, "Hospital id is required.");
 
@@ -34,8 +34,8 @@ export const POST = withApi(
     if (!hospital || hospital.status !== "VERIFIED")
       return fail(404, "Hospital not found.");
 
-    const existing = await prisma.review.findUnique({
-      where: { userId: session.sub },
+    const existing = await prisma.review.findFirst({
+      where: { userId: session.sub, hospitalId },
     });
     if (existing)
       return fail(409, "You have already submitted a review for a facility.");

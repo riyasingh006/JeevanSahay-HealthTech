@@ -5,6 +5,8 @@ import { interpretQuery } from "@/lib/nlp";
 import { fail, ok, withApi } from "@/lib/api-helpers";
 import { DEFAULT_CENTER, SERVICE_CATALOG, SPECIALTIES } from "@/lib/constants";
 import { estimateEtaMinutes, haversineKm } from "@/lib/utils";
+import { recordPatientSearch } from "@/lib/patient/search-history";
+
 import {
   GoogleApiError,
   googleKeyConfigured,
@@ -62,6 +64,24 @@ function buildPlacesQuery(params: Params): string {
 
   if (parts.length === 0) parts.push("hospital");
   return parts.join(" ");
+}
+
+function patientHistoryLabel(params: Params): string {
+  const parts = params.q ? [params.q.trim()] : [];
+  if (params.specialty && params.specialty !== "ALL") {
+    const specialty = SPECIALTIES.find((item) => item.key === params.specialty);
+    parts.push(specialty?.label ?? "specialist");
+  }
+  if (params.type) parts.push(params.type.toLowerCase());
+  if (params.service && params.service !== "ANY") {
+    const service = SERVICE_CATALOG.find((item) => item.key === params.service);
+    parts.push(service?.label ?? "healthcare service");
+  }
+  if (params.emergency === "1") parts.push("emergency care");
+  if (params.icu === "1") parts.push("ICU beds");
+  if (params.beds === "1") parts.push("available beds");
+  if (params.diagnostics === "1") parts.push("diagnostics");
+  return parts.join(" · ").slice(0, 300);
 }
 
 function toSearchResult(place: PlaceResult, origin: { lat: number; lng: number }) {
@@ -155,6 +175,7 @@ async function placesSearch(params: Params) {
       : withinRadius
     ).sort((a, b) => a.distanceKm - b.distanceKm);
 
+  await recordPatientSearch(patientHistoryLabel(params), "SEARCH");
   return ok({
     results,
     totalMatched: results.length,
@@ -231,13 +252,12 @@ export const GET = withApi(
     if (params.maxDistance != null)
       hospitals = hospitals.filter(
         (h) =>
-          Math.hypot(h.lat - need.location!.lat, h.lng - need.location!.lng) *
-            111 <=
-          params.maxDistance!
+          haversineKm(need.location!, { lat: h.lat, lng: h.lng }) <= params.maxDistance!
       );
 
     const ranked = rankHospitals(hospitals, need);
 
+    await recordPatientSearch(patientHistoryLabel(params), "SEARCH");
     return ok({
       results: ranked.slice(0, params.limit),
       totalMatched: ranked.length,

@@ -36,6 +36,7 @@ model User {
   hospitalId     String? // set for HOSPITAL_ADMIN users after hospital approval
   hospital       Hospital? @relation(fields: [hospitalId], references: [id])
   hospitalApplication HospitalApplication?
+  appointments   Appointment[]
   sessions       UserSession[]
   authOtps       AuthOtp[]
   savedHospitals SavedHospital[]
@@ -136,6 +137,7 @@ model Hospital {
   dailyStats  DailyStat[]
   savedBy     SavedHospital[]
   reviews     Review[]
+  appointments Appointment[]
 }
 
 model BedInventory {
@@ -163,6 +165,7 @@ model Doctor {
   languages       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  appointments    Appointment[]
 }
 
 model Service {
@@ -274,10 +277,35 @@ model Review {
   id         String   @id @default(cuid())
   hospitalId String
   hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
-  userId     String?  @unique
+  userId     String?
   name       String
   rating     Int // 1–5
   comment    String
   status     String   @default("PUBLISHED") // PUBLISHED | HIDDEN
   createdAt  DateTime @default(now())
+
+  @@unique([userId, hospitalId])
+}
+
+model Appointment {
+  id             String   @id @default(cuid())
+  patientId      String
+  patient        User     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  hospitalId     String?
+  hospital       Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  doctorId       String?
+  doctor         Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  patientName    String
+  patientEmail   String
+  patientPhone   String
+  scheduledAt    DateTime
+  status         String   @default("REQUESTED") // REQUESTED | CONFIRMED | DECLINED | CANCELLED | COMPLETED
+  hospitalNote   String?
+  respondedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([patientId, createdAt])
+  @@index([hospitalId, status, scheduledAt])
+  @@index([doctorId, scheduledAt])
 }

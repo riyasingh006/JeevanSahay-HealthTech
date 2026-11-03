@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession, hashPassword } from "@/lib/auth";
+import { requireRole, hashPassword } from "@/lib/auth";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
 
 const patchSchema = z.object({
@@ -21,7 +21,7 @@ const patchSchema = z.object({
 });
 
 export const GET = withApi(async () => {
-  const session = await requireSession();
+  const session = await requireRole("PATIENT");
   const user = await prisma.user.findUnique({
     where: { id: session.sub },
     select: {
@@ -53,7 +53,7 @@ export const GET = withApi(async () => {
 
 export const PATCH = withApi(
   async (req) => {
-    const session = await requireSession();
+    const session = await requireRole("PATIENT");
     const parsed = await parseBody(req, patchSchema);
     if (parsed.error) return parsed.error;
 
@@ -84,7 +84,7 @@ export const PATCH = withApi(
 /** Set or rotate the Digital Health Profile share PIN. */
 export const PUT = withApi(
   async (req) => {
-    const session = await requireSession();
+    const session = await requireRole("PATIENT");
     const schema = z.object({
       currentPassword: z.string().min(1),
       newPin: z.string().regex(/^\d{6}$/, "PIN must be exactly 6 digits"),

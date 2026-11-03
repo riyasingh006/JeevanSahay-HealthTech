@@ -75,17 +75,21 @@ export default function PatientDashboardPage() {
   const [patientLoc, setPatientLoc] = React.useState<{
     lat: number;
     lng: number;
+    label: string;
   } | null>(null);
 
   React.useEffect(() => {
-    fetch("/api/dashboard", { cache: "no-store" })
+    const loc = loadPatientLocation();
+    if (loc) setPatientLoc({ lat: loc.lat, lng: loc.lng, label: loc.label });
+    const endpoint = loc
+      ? `/api/dashboard?lat=${encodeURIComponent(loc.lat)}&lng=${encodeURIComponent(loc.lng)}`
+      : "/api/dashboard";
+    fetch(endpoint, { cache: "no-store", headers: { Accept: "application/json" } })
       .then((r) => r.json())
       .then((json) => {
         if (json.ok) setData(json.data as DashboardData);
       })
       .catch(() => {});
-    const loc = loadPatientLocation();
-    if (loc) setPatientLoc({ lat: loc.lat, lng: loc.lng });
   }, []);
 
   const displayName =
@@ -338,9 +342,9 @@ export default function PatientDashboardPage() {
                 <p className={styles.panelSub}>Ranked by suitability</p>
                 <p className={styles.locRow}>
                   <MapPin style={{ width: 11, height: 11, color: "#0f9fa8" }} aria-hidden />
-                  {data?.location || patientLoc
-                    ? `Using: ${data?.location || "My current location"}`
-                    : "New Delhi (default centre)"}
+                  {patientLoc
+                    ? `Using: ${patientLoc.label}`
+                    : "New Delhi (default centre; share a location to personalise)"}
                 </p>
               </div>
               <div className={styles.headActions}>

@@ -37,7 +37,7 @@
 ## Current status
 
 - Phase 0 inspection and implementation plan: complete.
-- Phase 1 authentication: complete; committed only after its verification gate passed.
-- Phase 2 Patient Portal: next; not started.
-- Phase 1 verification: `npm run test:auth` passes all 10 end-to-end checks against a disposable SQLite database and local SMTP capture server; `npm run typecheck` passes; `npm run lint` exits successfully with 21 pre-existing unused-variable warnings; production `npm run build` succeeds. Patient and hospital client shells were preserved byte-for-byte while adding server-side role/session guards.
-- No user database was seeded or migrated. Google and email providers were exercised with local test credentials/capture only; production Google and SMTP delivery still require owner credentials.
+- Phase 1 authentication: complete and verified; commit `3d882c1`.
+- Phase 2 Patient Portal: complete and tested. Added patient-only access checks, location-aware dashboard ranking, patient search history, verified-only saved-hospital views, and database-backed appointment requests/cancellation with a patient appointments page. The existing portal design remains intact.
+- Phase 2 verification: `npm run test:auth` passes 13 end-to-end checks against a disposable SQLite database and local SMTP capture server; `npm run typecheck` passes; `npm run lint` exits successfully with 18 existing unused-variable warnings in unrelated hospital/shared components; `npm run build` succeeds. Phase 1's patient and hospital client shells were preserved byte-for-byte while adding server-side role/session guards.
+- No user database was seeded or migrated. Google and email providers were exercised with local test credentials/capture only; production Google and SMTP delivery still require owner credentials. Phase 2 is ready to commit.

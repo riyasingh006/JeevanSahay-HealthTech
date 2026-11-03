@@ -1,12 +1,12 @@
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession, createShareToken, verifyShareToken } from "@/lib/auth";
-import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
+import { requireRole, createShareToken, verifyShareToken } from "@/lib/auth";
+import { fail, ok, withApi } from "@/lib/api-helpers";
+import { check } from "@/lib/rate-limit";
 
 /** Generate a short-lived signed QR token for the Digital Health Profile. */
 export const POST = withApi(
   async () => {
-    const session = await requireSession();
+    const session = await requireRole("PATIENT");
     const token = await createShareToken(session.sub);
     return ok({
       token,
@@ -30,6 +30,12 @@ export const GET = withApi(
     const userId = await verifyShareToken(token);
     if (!userId)
       return fail(401, "This QR code has expired. Ask the patient to refresh it.");
+    const userLimit = check(`share-resolve-user:${userId}`, 10, 5 * 60_000);
+    if (!userLimit.allowed) {
+      return fail(429, "Too many PIN attempts. Ask the patient to refresh the QR code.", {
+        retryAfterSeconds: userLimit.retryAfterSeconds,
+      });
+    }
 
     if (!/^\d{6}$/.test(pin))
       return fail(422, "Enter the patient's 6-digit access PIN.");
