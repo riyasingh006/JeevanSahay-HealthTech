@@ -6,7 +6,6 @@ import {
   Award,
   CalendarPlus,
   Car,
-  Info,
   MapPin,
   Navigation,
   Phone,
@@ -14,6 +13,7 @@ import {
 import { Badge, StatusBadge, LastUpdated } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SaveHospitalButton } from "@/components/patient/save-hospital-button";
+import { DemoDataBadge, DemoFacilityNotice, FacilityReportedNotice } from "@/components/ui/data-source";
 
 export interface AiMatch {
   hospital: {
@@ -21,6 +21,7 @@ export interface AiMatch {
     name: string;
     type: string;
     city: string;
+    isDemo?: boolean;
     addressLine?: string;
     phone: string;
     lat: number;
@@ -79,7 +80,6 @@ function FacilityDot({ state }: { state: ReturnType<typeof svcStatus> }) {
     <span className="inline-flex items-center gap-1.5 text-[11px] font-medium capitalize text-slate-600">
       <span className={`inline-block h-2 w-2 rounded-full ${color}`} aria-hidden />
       {state.toLowerCase()}
-      {state === "LIMITED" && <span className="text-slate-400">· Demo Data</span>}
     </span>
   );
 }
@@ -144,6 +144,7 @@ export function AiRecommendationCard({
               {h.name}
             </Link>
           </h3>
+          {h.isDemo && <DemoDataBadge />}
         </div>
         <Badge variant={isPrimary ? "saffron" : "primary"} size="sm">
           {RANK_LABELS[index] ?? "Good Match"}
@@ -189,19 +190,19 @@ export function AiRecommendationCard({
         {/* MATCH */}
         <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div className="rounded-lg border border-slate-100 bg-paper px-3 py-2">
-            <dt className="data-label">Doctors available</dt>
+            <dt className="data-label">Doctors listed</dt>
             <dd className="mt-0.5 text-sm font-semibold tabular-nums text-primary-950">
               {doctorsAvailable > 0 ? `${doctorsAvailable}` : "Information Unavailable"}
             </dd>
           </div>
           <div className="rounded-lg border border-slate-100 bg-paper px-3 py-2">
-            <dt className="data-label">General beds free</dt>
+            <dt className="data-label">General beds reported available</dt>
             <dd className="mt-0.5 text-sm font-semibold tabular-nums text-primary-950">
               {general ? `${general.available}` : "Information Unavailable"}
             </dd>
           </div>
           <div className="rounded-lg border border-slate-100 bg-paper px-3 py-2">
-            <dt className="data-label">ICU free</dt>
+            <dt className="data-label">ICU beds reported available</dt>
             <dd className="mt-0.5 text-sm font-semibold tabular-nums text-primary-950">
               {icu ? `${icu.available}` : "Information Unavailable"}
             </dd>
@@ -212,7 +213,7 @@ export function AiRecommendationCard({
               {emergencySvc === "MISSING" ? (
                 <span className="text-xs text-slate-400">Information Unavailable</span>
               ) : (
-                <StatusBadge status={emergencySvc} label="Emergency" />
+                <StatusBadge status={emergencySvc} label="Emergency status (reported)" />
               )}
             </dd>
           </div>
@@ -226,9 +227,9 @@ export function AiRecommendationCard({
           <span aria-hidden>·</span>
           <span>Reviews: Information Unavailable</span>
           <span aria-hidden>·</span>
-          <a href={`tel:${h.phone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1 font-medium text-care-700 hover:underline">
+          {!h.isDemo && h.phone && <a href={`tel:${h.phone.replace(/\s/g, "")}`} className="inline-flex items-center gap-1 font-medium text-care-700 hover:underline">
             <Phone className="h-3 w-3" aria-hidden /> {h.phone}
-          </a>
+          </a>}
           {h.lastAvailabilityUpdate && <LastUpdated at={h.lastAvailabilityUpdate} />}
         </div>
 
@@ -253,11 +254,13 @@ export function AiRecommendationCard({
           </div>
         </details>
 
-        <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-slate-400">
-          <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
-          Availability figures are Demo Data — a sample dataset maintained
-          manually. Appointment booking backend is not connected yet.
-        </p>
+        <div className="mt-2 space-y-1.5">
+          {h.isDemo && <DemoFacilityNotice />}
+          <FacilityReportedNotice />
+          <p className="text-[11px] leading-snug text-slate-500">
+            Appointment requests are sent to the facility and are not confirmed until it responds.
+          </p>
+        </div>
 
         {/* ACTIONS — reuse existing flows */}
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3.5">
@@ -274,16 +277,16 @@ export function AiRecommendationCard({
             />
             Compare
           </label>
-          <SaveHospitalButton hospitalId={h.id} saved={saved ?? false} onChange={() => onToggleSave?.()} />
-          <Button variant="ghost" size="sm" onClick={() => onDirections?.(match)}>
+          {!h.isDemo && <SaveHospitalButton hospitalId={h.id} saved={saved ?? false} onChange={() => onToggleSave?.()} />}
+          {!h.isDemo && <Button variant="ghost" size="sm" onClick={() => onDirections?.(match)}>
             <Navigation className="h-4 w-4" aria-hidden /> Get Directions
-          </Button>
+          </Button>}
           <Link href="/dashboard/doctors">
             <Button variant="secondary" size="sm">View Doctors</Button>
           </Link>
-          <Button variant="subtle" size="sm" onClick={() => onBook?.(match)}>
+          {!h.isDemo && <Button variant="subtle" size="sm" onClick={() => onBook?.(match)}>
             <CalendarPlus className="h-4 w-4" aria-hidden /> Book Appointment
-          </Button>
+          </Button>}
         </div>
       </div>
     </article>

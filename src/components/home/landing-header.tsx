@@ -10,7 +10,7 @@ const NAV = [
   { label: "Home", href: "#top", active: true },
   { label: "Features", href: "#features" },
   { label: "How It Works", href: "#how-it-works" },
-  { label: "Testimonials", href: "#testimonials" },
+  { label: "How it works", href: "#testimonials" },
   { label: "About Us", href: "#about" },
 ];
 

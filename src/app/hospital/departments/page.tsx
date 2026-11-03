@@ -105,7 +105,7 @@ export default function HospitalDepartmentsPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Department Management"
-        description="Manage departments, department heads, bed capacity, and department details with live data."
+        description="Manage departments, department heads, reported bed capacity and department details."
         icon={Building2}
         actions={
           <Button size="sm" className="gap-1.5" onClick={openCreate}>
@@ -116,7 +116,7 @@ export default function HospitalDepartmentsPage() {
       />
 
       <LiveRecordsNotice>
-        Department actions are local to the live store and keep summary cards
+        Department changes are saved for this verified hospital and keep summary cards
         consistent across the portal.
       </LiveRecordsNotice>
 
@@ -155,7 +155,7 @@ export default function HospitalDepartmentsPage() {
                 <TableHead>Department</TableHead>
                 <TableHead>Department Head</TableHead>
                 <TableHead>Doctors</TableHead>
-                <TableHead>Bed Capacity (live)</TableHead>
+                <TableHead>Reported bed capacity</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>

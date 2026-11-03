@@ -6,8 +6,8 @@ export const GET = withApi(async () => {
   await requireRole("SUPER_ADMIN");
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const [registeredUsers, verifiedHospitals, pendingApplications, pendingApplicationsCount, pendingHospitals, pendingHospitalsCount, beds, activeSpecialists, emergencySearches, openReports, auditTrail] = await Promise.all([
-    prisma.user.count(),
-    prisma.hospital.count({ where: { status: "VERIFIED" } }),
+    prisma.user.count({ where: { isDemo: false } }),
+    prisma.hospital.count({ where: { status: "VERIFIED", isDemo: false } }),
     prisma.hospitalApplication.findMany({
       where: { status: "PENDING_VERIFICATION" },
       select: { id: true, hospitalName: true, city: true, hospitalType: true, status: true, createdAt: true, user: { select: { email: true, emailVerifiedAt: true } } },
@@ -16,19 +16,19 @@ export const GET = withApi(async () => {
     }),
     prisma.hospitalApplication.count({ where: { status: "PENDING_VERIFICATION" } }),
     prisma.hospital.findMany({
-      where: { status: "PENDING_VERIFICATION" },
+      where: { status: "PENDING_VERIFICATION", isDemo: false },
       select: { id: true, name: true, city: true, type: true, status: true, createdAt: true },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
-    prisma.hospital.count({ where: { status: "PENDING_VERIFICATION" } }),
+    prisma.hospital.count({ where: { status: "PENDING_VERIFICATION", isDemo: false } }),
     prisma.bedInventory.aggregate({
-      where: { hospital: { status: "VERIFIED" } },
+      where: { hospital: { status: "VERIFIED", isDemo: false } },
       _sum: { total: true, available: true },
     }),
-    prisma.doctor.count({ where: { availability: "AVAILABLE", hospital: { status: "VERIFIED" } } }),
-    prisma.searchRecord.count({ where: { mode: "EMERGENCY", createdAt: { gte: since } } }),
-    prisma.report.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] } } }),
+    prisma.doctor.count({ where: { availability: "AVAILABLE", hospital: { status: "VERIFIED", isDemo: false } } }),
+    prisma.searchRecord.count({ where: { mode: "EMERGENCY", createdAt: { gte: since }, user: { isDemo: false } } }),
+    prisma.report.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] }, NOT: { subject: { startsWith: "[DEMO]" } } } }),
     prisma.auditLog.findMany({
       orderBy: { createdAt: "desc" },
       take: 12,

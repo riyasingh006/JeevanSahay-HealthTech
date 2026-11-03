@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { rankHospitals } from "@/lib/scoring";
+import { getSession } from "@/lib/auth";
 import { loadVerifiedHospitals } from "@/lib/hospital-service";
 import { interpretQuery } from "@/lib/nlp";
 import { fail, ok, withApi } from "@/lib/api-helpers";
@@ -218,7 +219,8 @@ export const GET = withApi(
         need.requiresDiagnostics = true;
     }
 
-    let hospitals = await loadVerifiedHospitals();
+    const session = await getSession();
+    let hospitals = await loadVerifiedHospitals({ includeDemo: session?.isDemo === true && params.emergency !== "1" });
 
     // Hard filters (capability gates, not ranking signals).
     if (params.type) hospitals = hospitals.filter((h) => h.type === params.type);

@@ -24,7 +24,8 @@ function SignupForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNext(params.get("next"));
-  const [role, setRole] = React.useState<"PATIENT" | "HOSPITAL_ADMIN">("PATIENT");
+  const initialRole = params.get("role") === "HOSPITAL_ADMIN" ? "HOSPITAL_ADMIN" : "PATIENT";
+  const [role, setRole] = React.useState<"PATIENT" | "HOSPITAL_ADMIN">(initialRole);
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [phone, setPhone] = React.useState("");

@@ -1,70 +1,51 @@
-# Jeevan Sahay implementation plan
+# Jeevan Sahay implementation plan and verification status
 
-## Inspection findings (2026-11-02)
+**Updated:** 2026-11-03
+**Working branch:** `feature/jeevan-sahay-final-completion`
+**Status:** Implementation and verification complete; no production deployment or real-user data migration was performed.
 
-- Existing application: Next.js 15 App Router, React 19, TypeScript, Tailwind CSS, Prisma 6, SQLite locally; existing patient-facing pages, public hospital discovery, AI assistant, API handlers, and a hospital portal shell already exist. Preserve these rather than replacing the application.
-- The Patient Portal is the visual reference. Its existing palette, shell, navigation, and components remain protected; hospital/admin work will extend the current patterns.
-- Authentication baseline: password hashing, login/register/logout endpoints, Google OAuth routes, and role checks existed, but signup activated accounts immediately, OTP/recovery controls were placeholders, Google OIDC validation was incomplete, sessions had no server-side revocation, and portal layouts relied on token-only middleware. Phase 1 now adds email verification/recovery/passwordless flows, PKCE + OIDC validation, database-backed revocable sessions, and server-side portal role checks.
-- Hospital pages and their provider currently use in-memory demo records. Existing database-backed APIs cover hospital discovery and some doctor/bed/service data; appointments, departments, emergency cases, and a full admin UI are not present. Admin APIs exist for users, hospitals, reports, and stats.
-- Prisma models users, hospitals, beds, doctors, services, saved hospitals, searches, notifications, reports, reviews, chat, and audit logs; Phase 1 adds OTPs, revocable sessions, and hospital applications. No versioned migration history or committed database exists. The seed now refuses non-empty databases, blocks demo fixtures in production, and provisions a super-admin only from explicitly configured environment values.
-- No project README, project-specific `AGENTS.md`, or automated test suite was found. Render configuration and environment-variable documentation are absent.
-- Baseline checks before implementation: production build succeeded; TypeScript passed after Next generated ignored image declarations; ESLint passed with 26 warnings; no automated tests existed. Phase 1 now adds an isolated SMTP-capture/database integration test runner.
+## Scope and protected behaviour
 
-## Protected behaviour and implementation rules
+The existing Next.js App Router application, patient-facing design, route structure, and working discovery/AI/emergency flows were retained and extended. The Patient Portal remains the visual reference. No wholesale rewrite was performed. User data was not seeded, reset, migrated, or deployed during this work; database migration tests used disposable SQLite databases only.
 
-1. Keep the existing architecture and patient UI; no portal rewrite or duplicate routes/components.
-2. Never seed, reset, or migrate against a user database during development. Exercise schema changes only against disposable databases, and make production changes additive/backward-compatible with backups and explicit migration steps.
-3. Do not grant roles from client input. Public signup is limited to patients and hospital applications; admin creation stays restricted to a protected provisioning path.
-4. Treat demo information as demo; do not label it live. Keep existing working patient discovery, profile, saved-hospital, emergency guidance, AI, and notification flows intact.
-5. After each phase: run available tests, lint/type/build checks, exercise affected UI-to-API-to-database flows, fix failures, report changed files and verified scope, then make a meaningful Git commit only when the gate passes.
-6. External Google OAuth and email delivery cannot be declared production-operational until the owner configures their credentials. Implement their real flows and report credential-dependent test limits accurately.
+## Phase status
 
-## Phases and verification gates
+| Phase | Result |
+|---|---|
+| 0. Inspect and plan | Inspected the existing application, database, routes, tools, and repository history before implementation; wrote this phase-by-phase plan. |
+| 1. Authentication | Email verification and passwordless codes, password recovery, Google OIDC with PKCE/state checks, secure cookies, database-backed revocable sessions, server-side role checks, and rate limits. Public signup cannot grant administrative roles. |
+| 2. Patient portal | Existing UI connected to scoped profile, saved-hospital, health-share, appointment, search, emergency, and notification workflows. Appointment requests persist and remain patient-scoped. |
+| 3. Hospital portal | Verified-hospital-only portal with persistent beds, doctors, departments, services, appointments, emergency logs, profile, settings, notifications, and recorded analytics. Cross-hospital reads/writes are denied; itemised bed changes update patient-facing aggregates transactionally. |
+| 4. Admin portal | Protected overview, pending application and legacy verification queues, transactional approval/rejection, searchable account suspension/reactivation, report resolution, CSV exports, notifications, and read-only audit browsing. Sensitive actions are audited and sessions revoked when required. |
+| 5. Database/backend | Versioned SQLite baseline, indexes, and additive demo-marker migration. Fresh deploy and synthetic existing-database upgrade paths were tested; the existing-database instructions stop if schema drift is detected. |
+| 6. Real/demo data | Explicit demo markers and source labels; normal discovery excludes fixtures, sample data cannot imply confirmed capacity or care, and emergency messaging does not claim dispatch or live availability. Demo seeding is opt-in, refuses non-empty databases, and is blocked in production. |
+| 7. Notifications/email | Account, hospital decision, appointment, and report messages use the configured mail service. Local SMTP-capture and failure-handling tests pass; real delivery requires SMTP credentials. |
+| 8. UI/responsiveness | Existing portal designs retained; shared navigation and new pages support responsive layouts. Mobile menu interaction and viewport overflow are checked against the production build. |
+| 9. Testing/bug fixing | TypeScript, ESLint, scoring regression, disposable-database/local-SMTP integration tests, production build, Prisma validation/migrations, dependency audit, and push/PR CI workflow. |
+| 10. Render preparation | Added a manual-deploy Blueprint for one same-origin Next.js service and persistent-disk SQLite. Migrations run at service startup after disk mount; credentials and first-admin setup are documented. No service was provisioned or deployed. |
 
-| Phase | Scope | Gate before proceeding |
-|---|---|---|
-| 1. Authentication | Email/password signup and login; patient registration and pending hospital applications; email OTP verification, resend limits, password recovery, Google OIDC validation/linking, role redirects, revocable sessions, and safe cookies. Keep the existing auth-page design. | Auth integration tests cover valid/invalid signup, OTP expiry/attempts/resend, login/logout, reset/session revocation, role denial, and OAuth validation; run lint, typecheck, and production build. Test SMTP against a local capture service; live Google/email provider tests remain credential-dependent. |
-| 2. Patient Portal | Audit existing workflows and connect only supported patient actions to real records without changing the visual design. | Existing patient flows plus affected APIs run against a disposable database; responsive/build checks. |
-| 3. Hospital Portal | Replace demo-only actions incrementally with scoped, verified-hospital APIs for dashboard, beds, doctors, departments, appointments, emergencies, services, profile, and analytics. Clearly mark any remaining sample data. | Cross-hospital isolation and CRUD/API/UI checks; no unverified hospital can manage data; build/lint/typecheck. |
-| 4. Admin Portal | Add an admin experience in the existing design language, complete review workflows, safe user/data management, complaints/reports, analytics, exports, and audit trail. | Admin-only access, approval/rejection audit checks, filtered/export data checks, and build gates. |
-| 5. Database/backend integration | Reconcile existing models with missing entities and relationships; add constraints/indexes and versioned migrations; use transactions and safe upgrade/backfill procedures. No destructive migrations without explicit approval. | Apply every migration to a fresh disposable database and an upgrade fixture; verify preserved records, constraints, and API behaviour. |
-| 6. Real/demo data | Remove misleading live claims, make remaining demo data visibly labelled and centrally managed, and avoid fake emergency/availability claims. | UI and API checks for all demo/real data labels and source behaviour. |
-| 7. Notifications/email | Reuse the mail service for account, hospital, appointment, and complaint notices; use environment configuration only. | Captured-email tests for templates/recipients and failure handling; real delivery requires provider credentials. |
-| 8. UI/responsiveness | Preserve the Patient Portal and extend its layout, states, controls, and mobile behaviour across other portals. | Desktop/tablet/mobile checks and interaction/empty/error state checks. |
-| 9. Testing/bug fixing | Establish and run automated unit/integration coverage, authorization tests, and frontend/backend checks across the app. | All repository checks pass; accurately list any provider-dependent tests not executable here. |
-| 10. Render preparation | Configure the existing app/database deployment, environment-variable guide, Google/email setup, production cookies/CORS/origins, and safe migration/deploy commands. | Validate production build/start configuration and document exact Render settings without exposing secrets. |
+## Verification record
 
-## Phase 3 implementation (completed)
+- `npm ci`: clean lockfile install; zero vulnerabilities. npm emitted non-security deprecation notices for the existing Recharts 2 and ESLint 9 lines and transitive `node-domexception`; major upgrades were deferred to avoid chart/UI churn and an unsupported ESLint-plugin combination.
+- `npm run lint`: passed with no errors.
+- `npm run typecheck`: passed.
+- `npm run test:scoring`: passed the emergency-priority versus routine-ranking regression.
+- `npm run test:auth`: all 26 disposable-database/local-SMTP integration checks passed across authentication, role denial, patient and hospital workflows, admin actions, migrations, audit, demo-data boundaries, explicit AI-unconfigured handling, and email failure handling.
+- `npx prisma validate`: schema valid. Three versioned migrations applied successfully to a fresh disposable SQLite database; status reported up to date.
+- `npm audit`: zero known vulnerabilities.
+- Gitleaks staged-change scan: no secrets found. The feature-history scan reported one false positive on generic implementation-plan prose, not a credential.
+- `npm run build`: production build passed and generated all 85 static pages plus dynamic API/portal routes.
+- Final-build responsive checks: `/hospitals` has no horizontal overflow at 320, 375, 390, 640, 768, 1024, 1152, 1279, 1280, and 1440 px; `/`, `/login`, and `/feedback` were checked at 320 and 390 px. The mobile menu opens; unauthenticated `/admin`, `/hospital`, and `/dashboard` requests redirect to `/login`; no browser errors were observed.
+- GitHub Actions CI was not included: the connected GitHub OAuth token lacks the `workflow` scope required to create workflow files. All listed checks were run locally; enable that scope and add CI in a follow-up if required.
 
-- Replaced the hospital demo provider with a session-backed provider that loads records only for the verified hospital on the authenticated session; preserved the existing shell and page design.
-- Added itemised beds, departments, emergency cases, and persisted settings. Existing hospital, doctor, service, and appointment records remain intact; public bed totals are updated transactionally.
-- Added hospital-scoped APIs for portal summary, beds, doctors, departments, services, appointments, emergencies, profile, settings, and notifications. Writes validate tenant ownership and state transitions and create audit records.
-- Removed fictional readiness and occupancy claims from hospital pages. Added case logging with non-identifying input guidance and truthful empty/loading/error states. Analytics use recorded appointments and emergency cases only.
-- Verified two-hospital isolation, role denial, persistence, appointment/emergency actions, patient-facing inventory updates, and itemised bed accounting through the disposable SQLite + local SMTP test harness.
+## External configuration and deployment limits
 
-## Phase 4 implementation (completed)
+The current shell contains no `SESSION_SECRET`, SMTP, Google OAuth, Google Maps, Gemini, or OpenAI credentials. Render generates `SESSION_SECRET` in the Blueprint; real email and Google sign-in remain disabled until the owner supplies the matching provider credentials. Google testing covers PKCE/state validation, not a live Google account. AI/Maps providers are optional and were not live-tested.
 
-- Added a server-protected super-admin shell and overview with database-backed account, hospital, bed, specialist, emergency-search, report, review-queue, and audit metrics.
-- Added paginated/searchable hospital application and legacy-record queues, verified-email and confirmed-map checks for application approval, mandatory rejection notes, transactional account/hospital linking, notifications, audit events, and SMTP decision emails with explicit delivery status.
-- Added a filtered account directory with suspend/reactivate only (no role promotion), last-admin/self-suspension safeguards, session revocation and audit logging.
-- Added filtered/paginated report review with validated transitions, required closure notes, concurrency protection and audit events; added read-only filtered/date-bounded audit browsing and current-page CSV exports with spreadsheet-formula protection.
-- Added responsive admin navigation/screens while preserving the existing patient and hospital UI. Updated rejected-applicant login messaging to show the recorded decision reason without issuing a session.
-- Verification: 23 disposable-database/local-SMTP integration checks pass, including admin role denial, application approval/rejection and notifications/email, report resolution, account session revocation, filtered exports' API scopes, and cross-portal protections. `npm run typecheck`, `npx prisma validate`, and the production build pass. `npm run lint` reports 11 pre-existing unused-variable warnings and no errors. Desktop and mobile admin screens and the report resolution interaction were checked against a temporary production server/database; both were removed afterward. No user database was migrated or seeded.
+The Render Blueprint keeps the existing SQLite provider, attaches a persistent disk, and disables auto-deploy. Its startup command runs migrations against the mounted disk before starting Next.js; do not move SQLite migrations into build/pre-deploy commands. A disk-backed service is single-instance and cannot use zero-downtime deploys. Review Render's plan and disk costs before provisioning. PostgreSQL or horizontal scaling requires a separate reviewed migration; changing only `DATABASE_URL` is unsafe.
 
-## Phase 5 implementation (completed)
+The first super-admin must be provisioned against the intended deployment database using the documented one-time bootstrap variables, then the bootstrap password removed. Never seed demo data in production. See `README.md` for the environment-variable reference, backup/upgrade instructions, and deployment setup.
 
-- Added a checked-in SQLite baseline migration for the complete Phase 4 schema and a separate additive migration for query indexes used by account, application, report, audit, hospital, notification, appointment, doctor, review, saved-hospital, chat, and search queries. Added Prisma CLI scripts for development migrations, deployment migrations, and status inspection.
-- Documented a conservative upgrade path for existing `db:push` SQLite databases: verify a backup, diff against the exact Phase 4 schema, stop on any drift, mark the baseline only when there is no difference, and then deploy only the additive indexes. No production or user database was inspected, seeded, or migrated.
-- Verification: current migrations deploy cleanly to a fresh disposable database and exactly match the current Prisma schema. On a separate synthetic Phase 4 database, the documented baseline flow passed; record counts and representative user/session, application, bed, notification, appointment, report, and audit values survived; foreign-key checks remained clean; representative new indexes were present. The existing 23 disposable-database/local-SMTP integration checks pass. `npm run typecheck`, `npm run lint` (11 pre-existing warnings, no errors), `npx prisma validate`, and `npm run build` pass. No migration was run against a real database.
+## Delivery status
 
-## Current status
-
-- Phase 0 inspection and implementation plan: complete.
-- Phase 1 Authentication: complete and verified; commit `3d882c1`.
-- Phase 2 Patient Portal: complete and verified; commit `bd8e55a`. Added patient-only API access checks, location-aware ranking, private search history, verified-only saved-hospital views, and persisted appointment requests/cancellation. Existing portal shell markup was preserved byte-for-byte.
-- Phase 1/2 verification: the disposable-database/local-SMTP integration suite passes; `npm run typecheck` passes; `npm run lint` succeeds with existing unused-variable warnings; Prisma validation and production build pass. No user database was seeded or migrated. Production Google and SMTP delivery still require the owner’s credentials.
-- Phase 3 Hospital Portal: implementation and verification complete. Replaced the in-memory demo provider with verified-hospital-scoped database loading and mutations across dashboard, beds, doctors, departments, appointments, emergency cases, services, profile, settings, notifications, and analytics. Existing page layout was retained; fake capacity/readiness figures were removed; itemised beds update patient-facing aggregates transactionally; appointment and emergency status changes are validated; writes are audited and isolated by hospital.
-- Phase 3 verification: 17 disposable-database/local-SMTP integration checks pass, including cross-hospital isolation, patient-facing bed/service updates, appointment workflows, emergency records, settings/profile persistence, and role denials. `npm run typecheck`, `npm run lint` (11 existing warnings), `prisma validate`, and the production build pass. No real database was seeded or migrated.
-- Phase 4 Admin Portal: complete and verified. The pending-application workflow now enables verified hospital admins to enter their own scoped portal only after approval; rejection remains session-free and displays its recorded reason.
-- Phase 5 Database/backend integration: complete and verified. The SQLite baseline and additive index migrations are versioned; fresh deploys and a synthetic existing-database baseline/upgrade are verified without record loss. Production databases remain untouched.
-- Next: Phase 6 audits and labels any remaining demo data and removes unsupported live/availability/emergency claims.
+All implementation and verification changes are isolated on `feature/jeevan-sahay-final-completion`. The delivery is a review-only pull request against `main`; the branch must not be merged or deployed without the user's approval.

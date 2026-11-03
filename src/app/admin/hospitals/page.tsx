@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
+import { DemoDataBadge } from "@/components/ui/data-source";
 
 type Application = {
   id: string;
@@ -35,6 +36,7 @@ type LegacyHospital = {
   type: string;
   status: string;
   registrationNumber: string | null;
+  isDemo: boolean;
   addressLine: string;
   city: string;
   state: string;
@@ -162,7 +164,7 @@ export default function AdminHospitalsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="text-xs font-semibold uppercase tracking-[0.15em] text-saffron-700">Platform administration</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-primary-950">Hospitals & verification</h1><p className="mt-2 max-w-3xl text-sm text-slate-600">Review registration details, verify the applicant’s email and map location, then record an approval or a clear rejection reason.</p></div>
-        <Button variant="secondary" size="sm" onClick={() => downloadCsv(`hospital-review-${tab.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`, ["Name", "Registration number", "Type", "Status", "City", "Email", "Email verified", "Submitted"], [...appRows.map((item) => [item.hospitalName, item.registrationNumber, item.hospitalType, item.status, item.city, item.user.email, item.user.emailVerifiedAt ? "Yes" : "No", item.createdAt]), ...hospitalRows.map((item) => [item.name, item.registrationNumber, item.type, item.status, item.city, item.email, "", item.createdAt])])} disabled={appRows.length + hospitalRows.length === 0}><Download className="mr-2 h-4 w-4" aria-hidden />Export current page</Button>
+        <Button variant="secondary" size="sm" onClick={() => downloadCsv(`hospital-review-${tab.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`, ["Name", "Registration number", "Type", "Status", "Demo data", "City", "Email", "Email verified", "Submitted"], [...appRows.map((item) => [item.hospitalName, item.registrationNumber, item.hospitalType, item.status, "No", item.city, item.user.email, item.user.emailVerifiedAt ? "Yes" : "No", item.createdAt]), ...hospitalRows.map((item) => [item.name, item.registrationNumber, item.type, item.status, item.isDemo ? "Yes" : "No", item.city, item.email, "", item.createdAt])])} disabled={appRows.length + hospitalRows.length === 0}><Download className="mr-2 h-4 w-4" aria-hidden />Export current page</Button>
       </div>
       {error && <AdminError message={error} retry={() => void Promise.all([applications.refresh(), hospitals.refresh()])} />}
 
@@ -181,7 +183,7 @@ export default function AdminHospitalsPage() {
               </article>)}
               {filteredApps.length > 0 && applications.data && <AdminPagination page={applications.data.page} pageSize={applications.data.pageSize} total={applications.data.total} onPage={setApplicationPage} />}
               {filteredHospitals.length > 0 && <h3 className="pt-2 text-sm font-semibold text-primary-950">Existing hospital records</h3>}
-              {filteredHospitals.map((item) => <article key={item.id} className="rounded-xl border border-slate-200 p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-primary-950">{item.name}</h2><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Existing record · {item.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-sm text-slate-600">{item.type} · {item.city}, {item.state} · Added {formatAdminDate(item.createdAt)}</p><p className="mt-2 text-sm text-slate-700">{item.addressLine}, {item.city}, {item.state} {item.pincode}</p></div>{item.status === "PENDING_VERIFICATION" && <div className="flex gap-2"><Button size="sm" onClick={() => void openReview({ kind: "hospital", record: item }, "VERIFIED")}>Verify</Button><Button size="sm" variant="secondary" className="text-red-700" onClick={() => void openReview({ kind: "hospital", record: item }, "REJECTED")}>Reject</Button></div>}</div></article>)}
+              {filteredHospitals.map((item) => <article key={item.id} className="rounded-xl border border-slate-200 p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-primary-950">{item.name}</h2>{item.isDemo && <DemoDataBadge />}<span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Existing record · {item.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-sm text-slate-600">{item.type} · {item.city}, {item.state} · Added {formatAdminDate(item.createdAt)}</p><p className="mt-2 text-sm text-slate-700">{item.addressLine}, {item.city}, {item.state} {item.pincode}</p></div>{item.status === "PENDING_VERIFICATION" && <div className="flex gap-2"><Button size="sm" onClick={() => void openReview({ kind: "hospital", record: item }, "VERIFIED")}>Verify</Button><Button size="sm" variant="secondary" className="text-red-700" onClick={() => void openReview({ kind: "hospital", record: item }, "REJECTED")}>Reject</Button></div>}</div></article>)}
               {hospitals.data && <AdminPagination page={hospitals.data.page} pageSize={hospitals.data.pageSize} total={hospitals.data.total} onPage={setHospitalPage} />}
             </div>
           )}

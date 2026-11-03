@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { DemoDataBadge, DemoFacilityNotice, FacilityReportedNotice } from "@/components/ui/data-source";
 import { SPECIALTIES, DOCTOR_AVAILABILITY_LABEL } from "@/lib/constants";
 import { AppointmentDialog, type BookingDoctor } from "@/components/patient/appointment-dialog";
 import { useDebounce } from "@/components/patient/use-debounce";
@@ -38,6 +39,7 @@ interface DoctorRow {
     name: string;
     city: string;
     type: string;
+    isDemo: boolean;
   };
 }
 
@@ -99,9 +101,11 @@ function DoctorsClient() {
       <header>
         <h1 className="institutional-heading text-2xl">Find a Doctor</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Doctors at verified hospitals — filter by speciality or city.
+          Doctors listed by verified hospitals. Availability is facility-reported; confirm directly before travelling.
         </p>
       </header>
+      <div className="mt-4"><FacilityReportedNotice /></div>
+      {doctors.some((doctor) => doctor.hospital.isDemo) && <DemoFacilityNotice />}
 
       <Card className="mt-4">
         <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_220px_180px]">
@@ -182,7 +186,10 @@ function DoctorsClient() {
                 <CardContent className="flex flex-1 flex-col gap-2 p-5">
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="text-base font-semibold text-primary-950">Dr. {displayName(d.name)}</h2>
-                    <StatusBadge status={d.availability} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {d.hospital.isDemo && <DemoDataBadge />}
+                      <StatusBadge status={d.availability} />
+                    </div>
                   </div>
                 <p className="text-sm font-medium text-care-700">
                   {spec?.label ?? d.specialty}
@@ -217,7 +224,7 @@ function DoctorsClient() {
                     variant="primary"
                     size="sm"
                     className="w-full gap-1.5"
-                    disabled={d.availability === "UNAVAILABLE"}
+                    disabled={d.hospital.isDemo || d.availability === "UNAVAILABLE"}
                     onClick={() =>
                       setBooking({
                         id: d.id,
@@ -233,9 +240,11 @@ function DoctorsClient() {
                     }
                   >
                     <CalendarPlus className="h-4 w-4" aria-hidden />
-                    {d.availability === "UNAVAILABLE"
-                      ? "Not available"
-                      : DOCTOR_AVAILABILITY_LABEL[d.availability] ?? "Book"}
+                    {d.hospital.isDemo
+                      ? "Sample data — booking disabled"
+                      : d.availability === "UNAVAILABLE"
+                        ? "Not available"
+                        : DOCTOR_AVAILABILITY_LABEL[d.availability] ?? "Book"}
                   </Button>
                 </div>
               </CardContent>

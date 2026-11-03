@@ -111,6 +111,10 @@ export function AppointmentDialog({
     event.preventDefault();
     setSubmitError("");
     if (!doctor) return;
+    if (user?.isDemo) {
+      setSubmitError("Appointment requests are disabled for demo accounts.");
+      return;
+    }
     setSaving(true);
     try {
       const response = await fetch("/api/appointments", {
@@ -156,7 +160,9 @@ export function AppointmentDialog({
 
         <p className="flex items-start gap-2 rounded-lg border border-status-info-border bg-status-info-bg px-3 py-2.5 text-xs font-medium text-status-info-fg">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          This request is saved to your account but does not reserve a slot. Call the hospital to confirm availability before visiting.
+          {user?.isDemo
+            ? "Demo accounts cannot submit appointment requests. No request will be sent to a hospital."
+            : "This request is saved to your account but does not reserve a slot. Call the hospital to confirm availability before visiting."}
         </p>
 
         {step === "slot" && (
@@ -210,7 +216,7 @@ export function AppointmentDialog({
             <Button
               size="lg"
               className="w-full"
-              disabled={!time}
+              disabled={!time || user?.isDemo === true}
               onClick={() => setStep("details")}
             >
               Continue
@@ -270,7 +276,7 @@ export function AppointmentDialog({
               <Button type="button" variant="secondary" size="lg" onClick={() => setStep("slot")}>
                 Back
               </Button>
-              <Button type="submit" variant="primary" size="lg" loading={saving}>
+              <Button type="submit" variant="primary" size="lg" loading={saving} disabled={user?.isDemo === true}>
                 Send Appointment Request
               </Button>
             </div>

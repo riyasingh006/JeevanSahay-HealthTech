@@ -108,7 +108,7 @@ export default function HospitalEmergencyPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Emergency Status"
-        description="Monitor live emergency cases, severity, location, assigned department, and ICU availability."
+        description="Review the hospital’s recorded emergency cases, severity, location, assigned department and reported ICU inventory."
         icon={Siren}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -148,7 +148,7 @@ export default function HospitalEmergencyPage() {
             <div className="flex items-center justify-between"><span className="text-slate-600">In treatment</span><span className="tabular-nums text-primary-900">{summary.inTreatment}</span></div>
           </div>
         </SectionCard>
-        <SectionCard title="Response Overview" description="live queue state">
+        <SectionCard title="Response Overview" description="Recorded queue state">
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-slate-600">Received</span><span className="tabular-nums">{summary.received}</span></div>
             <div className="flex items-center justify-between"><span className="text-slate-600">In Treatment</span><span className="tabular-nums">{summary.inTreatment}</span></div>
@@ -159,7 +159,7 @@ export default function HospitalEmergencyPage() {
 
       <SectionCard
         title="Emergency Cases"
-        description="live cases with severity indicators, time reported, status, assigned department and location."
+        description="Recorded cases with severity indicators, reported time, status, assigned department and location."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <NativeSelect value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="h-9 w-40">

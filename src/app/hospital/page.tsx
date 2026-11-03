@@ -1,5 +1,8 @@
 "use client";
 
+import * as React from "react";
+import { useRouter } from "next/navigation";
+
 import Link from "next/link";
 import {
   Activity,
@@ -52,6 +55,7 @@ function timeAgo(value: string): string {
 }
 
 export default function HospitalDashboardPage() {
+  const router = useRouter();
   const {
     beds,
     bedInventory,
@@ -62,7 +66,13 @@ export default function HospitalDashboardPage() {
     appointments,
     profile,
     activity,
+    settings,
   } = useHospitalPortal();
+
+  React.useEffect(() => {
+    if (settings.display.landingPage === "beds") router.replace("/hospital/beds");
+    if (settings.display.landingPage === "appointments") router.replace("/hospital/appointments");
+  }, [router, settings.display.landingPage]);
 
   const counts = bedInventoryCounts(bedInventory, beds);
   const byType = bedInventoryByType(bedInventory, beds);

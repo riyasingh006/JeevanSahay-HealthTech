@@ -6,7 +6,7 @@ import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
 export const GET = withApi(async () => {
   const session = await requireRole("PATIENT");
   const saved = await prisma.savedHospital.findMany({
-    where: { userId: session.sub, hospital: { is: { status: "VERIFIED" } } },
+    where: { userId: session.sub, hospital: { is: { status: "VERIFIED", ...(session.isDemo ? {} : { isDemo: false }) } } },
     include: {
       hospital: {
         select: {
@@ -18,6 +18,7 @@ export const GET = withApi(async () => {
           lat: true,
           lng: true,
           lastAvailabilityUpdate: true,
+          isDemo: true,
           beds: { where: { category: { in: ["GENERAL", "ICU"] } } },
         },
       },
@@ -37,7 +38,7 @@ export const POST = withApi(
     const hospital = await prisma.hospital.findUnique({
       where: { id: parsed.data.hospitalId },
     });
-    if (!hospital || hospital.status !== "VERIFIED")
+    if (!hospital || hospital.status !== "VERIFIED" || (hospital.isDemo && !session.isDemo))
       return fail(404, "Hospital not found.");
 
     await prisma.savedHospital.upsert({

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { DemoDataBadge } from "@/components/ui/data-source";
 
 type Account = {
   id: string;
@@ -17,6 +18,7 @@ type Account = {
   role: "PATIENT" | "HOSPITAL_ADMIN" | "SUPER_ADMIN";
   status: string;
   phone: string | null;
+  isDemo: boolean;
   hospitalId: string | null;
   hospital: { name: string; status: string } | null;
   emailVerifiedAt: string | null;
@@ -76,7 +78,7 @@ export default function AdminUsersPage() {
   }
 
   function exportPage() {
-    downloadCsv(`accounts-page-${page}-${new Date().toISOString().slice(0, 10)}.csv`, ["Name", "Email", "Role", "Status", "Phone", "Hospital", "Hospital status", "Email verified", "Created"], accounts.map((account) => [account.name, account.email, account.role, account.status, account.phone ?? "", account.hospital?.name ?? "", account.hospital?.status ?? "", account.emailVerifiedAt ? "Yes" : "No", account.createdAt]));
+    downloadCsv(`accounts-page-${page}-${new Date().toISOString().slice(0, 10)}.csv`, ["Name", "Email", "Role", "Status", "Demo data", "Phone", "Hospital", "Hospital status", "Email verified", "Created"], accounts.map((account) => [account.name, account.email, account.role, account.status, account.isDemo ? "Yes" : "No", account.phone ?? "", account.hospital?.name ?? "", account.hospital?.status ?? "", account.emailVerifiedAt ? "Yes" : "No", account.createdAt]));
   }
 
   return (
@@ -101,7 +103,7 @@ export default function AdminUsersPage() {
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 font-semibold">Account</th><th className="px-4 py-3 font-semibold">Role</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Hospital</th><th className="px-4 py-3 font-semibold">Joined</th><th className="px-4 py-3 font-semibold">Action</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {accounts.map((account) => <tr key={account.id} className="align-top hover:bg-slate-50/70">
-                    <td className="px-4 py-4"><p className="font-semibold text-primary-950">{account.name}</p><p className="mt-0.5 text-slate-600">{account.email}</p><p className="mt-1 text-xs text-slate-500">{account.phone || "No phone"} · {account.emailVerifiedAt ? "Email verified" : "Email not verified"}</p></td>
+                    <td className="px-4 py-4"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-primary-950">{account.name}</p>{account.isDemo && <DemoDataBadge />}</div><p className="mt-0.5 text-slate-600">{account.email}</p><p className="mt-1 text-xs text-slate-500">{account.phone || "No phone"} · {account.emailVerifiedAt ? "Email verified" : "Email not verified"}</p></td>
                     <td className="px-4 py-4"><span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">{account.role.replaceAll("_", " ")}</span></td>
                     <td className="px-4 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${account.status === "ACTIVE" ? "bg-green-50 text-green-800" : account.status === "SUSPENDED" ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-800"}`}>{account.status.replaceAll("_", " ")}</span></td>
                     <td className="px-4 py-4">{account.hospital ? <><p className="font-medium text-slate-800">{account.hospital.name}</p><p className="text-xs text-slate-500">{account.hospital.status.replaceAll("_", " ")}</p></> : <span className="text-slate-400">—</span>}</td>

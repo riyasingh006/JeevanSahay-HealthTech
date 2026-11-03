@@ -46,7 +46,7 @@ export default function HospitalSettingsPage() {
       />
 
       <LiveRecordsNotice>
-        These preferences are saved to your hospital account. In-app alerts are stored here; email and SMS delivery require a configured provider.
+        Email alerts apply to appointment requests and cancellations when SMTP is configured. SMS is not connected; emergency, bed-capacity and daily-summary toggles are stored preferences and do not currently send alerts.
       </LiveRecordsNotice>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -76,7 +76,7 @@ export default function HospitalSettingsPage() {
         <SectionCard title="Dashboard Display Preferences" description="UI behavior">
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-              <p className="text-sm text-primary-950">Show live Badges</p>
+              <p className="text-sm text-primary-950">Show data-source badges</p>
               <Switch
                 checked={form.display.showLiveBadges}
                 onCheckedChange={(v) => setForm((f) => ({ ...f, display: { ...f.display, showLiveBadges: v } }))}
@@ -147,7 +147,7 @@ export default function HospitalSettingsPage() {
               <p className="text-sm font-semibold text-primary-950">Notification delivery</p>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Appointment and availability changes create in-app notifications. Email and SMS preferences are recorded but need an external delivery provider before they can send messages.
+              Appointment requests and cancellations create in-app alerts. The Email toggle enables those email notices when SMTP is configured. SMS, bed-capacity alerts and daily summaries are not connected to an outbound delivery provider.
             </p>
           </CardContent>
         </Card>

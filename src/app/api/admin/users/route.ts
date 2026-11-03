@@ -38,6 +38,7 @@ export const GET = withApi(async (req) => {
         role: true,
         status: true,
         phone: true,
+        isDemo: true,
         hospitalId: true,
         hospital: { select: { name: true, status: true } },
         emailVerifiedAt: true,

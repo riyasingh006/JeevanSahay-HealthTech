@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, requireRole } from "@/lib/auth";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
+import { isEmailDeliveryConfigured, sendPortalNoticeEmail } from "@/lib/email";
 
 const reportStatuses = ["OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED"] as const;
 const querySchema = z.object({
@@ -93,7 +94,26 @@ export const PATCH = withApi(
       return report;
     });
     if (!changed) return fail(409, "This report changed elsewhere. Refresh and review its latest status.");
-    return ok({ report: changed });
+    let emailDelivery: "sent" | "not_configured" | "failed" | "not_requested" = "not_requested";
+    if (changed.contactEmail) {
+      const configured = isEmailDeliveryConfigured();
+      emailDelivery = configured ? "failed" : "not_configured";
+      if (configured) {
+        try {
+          await sendPortalNoticeEmail({
+            to: changed.contactEmail,
+            name: changed.reporterName ?? undefined,
+            subject: "Update on your Jeevan Sahay report",
+            paragraphs: [`The status of your report has been updated to ${changed.status}. For your privacy, this email does not include the report contents or review notes.`],
+          });
+          emailDelivery = "sent";
+        } catch (error) {
+          emailDelivery = "failed";
+          console.error("[admin-reports] reporter email notification failed", error);
+        }
+      }
+    }
+    return ok({ report: changed, emailDelivery });
   },
   { limit: 40, windowMs: 60_000, keyPrefix: "admin-reports" }
 );

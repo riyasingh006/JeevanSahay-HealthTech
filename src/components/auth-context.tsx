@@ -8,7 +8,9 @@ export interface ClientSession {
   email: string;
   role: "PATIENT" | "HOSPITAL_ADMIN" | "SUPER_ADMIN";
   hospitalId?: string | null;
+  isDemo?: boolean;
 }
+
 
 interface AuthContextValue {
   user: ClientSession | null;

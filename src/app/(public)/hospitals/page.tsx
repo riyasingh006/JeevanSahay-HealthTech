@@ -5,7 +5,7 @@ import { CardSkeleton } from "@/components/ui/skeleton";
 export const metadata = {
   title: "Find Hospital",
   description:
-    "Search and compare verified hospitals by specialty, availability, emergency capability and distance.",
+    "Search verified hospital listings by speciality and distance. Bed, doctor, and service details are facility-reported and should be confirmed directly."
 };
 
 export default function HospitalsPage() {

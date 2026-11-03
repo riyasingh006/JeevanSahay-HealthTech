@@ -123,7 +123,7 @@ export default function HospitalBedsPage() {
         actions={
           <Button size="sm" className="gap-1.5" onClick={openCreate}>
             <Plus className="h-4 w-4" aria-hidden />
-            Add live Bed
+            Add bed record
           </Button>
         }
       />

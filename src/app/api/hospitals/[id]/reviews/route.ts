@@ -7,6 +7,8 @@ export const GET = withApi(
   async (_req) => {
     const id = idFromUrl(_req);
     if (!id) return fail(400, "Hospital id is required.");
+    const hospital = await prisma.hospital.findFirst({ where: { id, status: "VERIFIED", isDemo: false }, select: { id: true } });
+    if (!hospital) return fail(404, "Hospital not found.");
     const reviews = await prisma.review.findMany({
       where: { hospitalId: id, status: "PUBLISHED" },
       orderBy: { createdAt: "desc" },
@@ -20,6 +22,7 @@ export const GET = withApi(
 export const POST = withApi(
   async (req) => {
     const session = await requireRole("PATIENT");
+    if (session.isDemo) return fail(403, "Reviews are disabled for demo accounts.");
     const hospitalId = idFromUrl(req);
     if (!hospitalId) return fail(400, "Hospital id is required.");
 
@@ -31,7 +34,7 @@ export const POST = withApi(
     if (parsed.error) return parsed.error;
 
     const hospital = await prisma.hospital.findUnique({ where: { id: hospitalId } });
-    if (!hospital || hospital.status !== "VERIFIED")
+    if (!hospital || hospital.status !== "VERIFIED" || hospital.isDemo)
       return fail(404, "Hospital not found.");
 
     const existing = await prisma.review.findFirst({

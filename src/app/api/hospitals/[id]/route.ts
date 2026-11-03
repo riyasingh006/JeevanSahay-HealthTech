@@ -1,5 +1,6 @@
 ﻿import { prisma } from "@/lib/prisma";
 import { loadHospitalById } from "@/lib/hospital-service";
+import { getSession } from "@/lib/auth";
 import { fail, idFromUrl, ok, withApi } from "@/lib/api-helpers";
 import { FRESHNESS_MS } from "@/lib/constants";
 import {
@@ -41,6 +42,7 @@ export const GET = withApi(
             email: null,
             website: place.website ?? null,
             about: null,
+            isDemo: false,
             accreditation: null,
             established: null,
             lastAvailabilityUpdate: new Date().toISOString(),
@@ -66,7 +68,8 @@ export const GET = withApi(
     }
 
     // ---- Internal verified directory ----
-    const hospital = await loadHospitalById(id);
+    const session = await getSession();
+    const hospital = await loadHospitalById(id, { includeDemo: session?.isDemo === true });
     if (!hospital) return fail(404, "Hospital not found.");
 
     // Public users only see verified hospitals.

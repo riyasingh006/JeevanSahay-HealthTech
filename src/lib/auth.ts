@@ -13,7 +13,9 @@ export interface SessionPayload {
   name: string;
   role: Role;
   hospitalId?: string;
+  isDemo?: boolean;
 }
+
 
 const COOKIE_NAME = "js_session";
 const RESET_COOKIE_NAME = "js_password_reset";
@@ -57,6 +59,7 @@ async function signSessionToken(
     name: payload.name,
     role: payload.role,
     hospitalId: payload.hospitalId,
+    isDemo: payload.isDemo ?? false,
     sid: sessionId,
     ver: authVersion,
   })
@@ -100,7 +103,9 @@ export async function setSessionCookie(
     name: user.name,
     role: user.role,
     hospitalId: user.hospitalId ?? undefined,
+    isDemo: user.isDemo,
   };
+
   const token = await signSessionToken(canonicalPayload, sessionId, user.authVersion, ttlSeconds);
   const store = await cookies();
   store.set(COOKIE_NAME, token, {
@@ -260,7 +265,9 @@ export async function getSession(): Promise<SessionPayload | null> {
       name: user.name,
       role: user.role,
       hospitalId: user.hospitalId ?? undefined,
+      isDemo: user.isDemo,
     };
+
   } catch {
     return null;
   }

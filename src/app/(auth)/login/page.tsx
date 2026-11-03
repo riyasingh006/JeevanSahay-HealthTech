@@ -565,12 +565,9 @@ function LoginForm() {
               <span className="h-px flex-1 bg-[#E2E8F0]" />
             </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setError("");
-              window.location.href = "/api/auth/google";
-            }}
+          <a
+            href="/api/auth/google"
+            onClick={() => setError("")}
             className="mt-4 flex h-[50px] w-full items-center justify-center gap-3 rounded-[10px] border border-[#D7E0EC] bg-white text-[14px] font-bold text-[#102A56] transition-colors hover:bg-[#F5F8FC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#062B67]"
           >
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
@@ -580,7 +577,7 @@ function LoginForm() {
                 <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 40.4 44 35 44 24c0-1.3-.1-2.6-.4-3.9z"/>
               </svg>
               Continue with Google
-            </button>
+            </a>
 
             <button
               type="button"

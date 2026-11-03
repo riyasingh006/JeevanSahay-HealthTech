@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { DemoDataBadge } from "@/components/ui/data-source";
 
 type ReportStatus = "OPEN" | "IN_REVIEW" | "RESOLVED" | "DISMISSED";
 type Report = {
@@ -69,11 +70,12 @@ export default function AdminReportsPage() {
     }
     setSaving(true);
     try {
-      await adminRequest<{ report: Report }>("/api/admin/reports", {
+      const result = await adminRequest<{ report: Report; emailDelivery: "sent" | "not_configured" | "failed" | "not_requested" }>("/api/admin/reports", {
         method: "PATCH",
         body: JSON.stringify({ reportId: target.id, expectedStatus: target.status, status: nextStatus, resolutionNote: note.trim() || undefined }),
       });
-      toast({ title: "Report updated", description: `Status changed to ${nextStatus.replaceAll("_", " ")}. The decision was recorded in the audit trail.`, variant: "success" });
+      const emailMessage = result.emailDelivery === "sent" ? "The reporter was notified by email." : result.emailDelivery === "not_requested" ? "No contact email was provided." : result.emailDelivery === "not_configured" ? "Email is not configured; the report status was still saved." : "Email delivery failed; the report status was still saved.";
+      toast({ title: "Report updated", description: `Status changed to ${nextStatus.replaceAll("_", " ")}. The decision was recorded in the audit trail. ${emailMessage}`, variant: "success" });
       setTarget(null);
       await resource.refresh();
     } catch (cause) {
@@ -109,7 +111,7 @@ export default function AdminReportsPage() {
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 font-semibold">Report</th><th className="px-4 py-3 font-semibold">Reporter</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Submitted</th><th className="px-4 py-3 font-semibold">Review</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {reports.map((report) => <tr key={report.id} className="align-top hover:bg-slate-50/70">
-                    <td className="px-4 py-4"><p className="font-semibold text-primary-950">{report.subject}</p><p className="mt-1 line-clamp-2 max-w-xl text-slate-600">{report.message}</p><p className="mt-1 text-xs text-slate-500">{report.category.replaceAll("_", " ")}{report.relatedHospital ? ` · ${report.relatedHospital}` : ""}</p></td>
+                    <td className="px-4 py-4"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-primary-950">{report.subject.replace(/^\[DEMO\]\s*/, "")}</p>{report.subject.startsWith("[DEMO]") && <DemoDataBadge />}</div><p className="mt-1 line-clamp-2 max-w-xl text-slate-600">{report.message}</p><p className="mt-1 text-xs text-slate-500">{report.category.replaceAll("_", " ")}{report.relatedHospital ? ` · ${report.relatedHospital}` : ""}</p></td>
                     <td className="px-4 py-4"><p className="text-slate-800">{report.reporterName || "Not provided"}</p><p className="text-xs text-slate-500">{report.contactEmail || "No contact email"}</p></td>
                     <td className="px-4 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${report.status === "OPEN" ? "bg-amber-50 text-amber-800" : report.status === "IN_REVIEW" ? "bg-blue-50 text-blue-800" : report.status === "RESOLVED" ? "bg-green-50 text-green-800" : "bg-slate-100 text-slate-700"}`}>{report.status.replaceAll("_", " ")}</span></td>
                     <td className="px-4 py-4 whitespace-nowrap text-slate-600">{formatAdminDate(report.createdAt)}</td>

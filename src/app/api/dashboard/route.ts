@@ -32,14 +32,14 @@ export const GET = withApi(async (req) => {
 
   const [hospitalsRaw, recentSearches, saved, unreadNotifications] =
     await Promise.all([
-      loadVerifiedHospitals(),
+      loadVerifiedHospitals({ includeDemo: session.isDemo === true }),
       prisma.searchRecord.findMany({
         where: { userId: session.sub },
         orderBy: { createdAt: "desc" },
         take: 5,
       }),
       prisma.savedHospital.findMany({
-        where: { userId: session.sub, hospital: { is: { status: "VERIFIED" } } },
+        where: { userId: session.sub, hospital: { is: { status: "VERIFIED", ...(session.isDemo ? {} : { isDemo: false }) } } },
         include: {
           hospital: {
             select: {
@@ -51,6 +51,7 @@ export const GET = withApi(async (req) => {
               lat: true,
               lng: true,
               lastAvailabilityUpdate: true,
+              isDemo: true,
               beds: { where: { category: { in: ["GENERAL", "ICU"] } } },
             },
           },

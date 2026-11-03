@@ -2,9 +2,7 @@
 
 import * as React from "react";
 import {
-  Activity,
   BedDouble,
-  Building2,
   FlaskConical,
   PhoneCall,
   Siren,
@@ -15,7 +13,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, LastUpdated, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -256,7 +253,7 @@ export function HospitalDetailTabs({
       {/* ---------------- Beds ---------------- */}
       <TabsContent value="beds">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-slate-600">Live resource availability</p>
+          <p className="text-sm text-slate-600">Facility-reported resources</p>
           <LastUpdated at={hospital.lastAvailabilityUpdate} prefix="Availability" />
         </div>
         <BedCards beds={hospital.beds} />
@@ -317,7 +314,7 @@ export function HospitalDetailTabs({
                 108
               </a>{" "}
               (ambulance) first. This page is informational and may not reflect
-              real-time capacity.
+              live operational capacity.
             </div>
           </div>
         </div>

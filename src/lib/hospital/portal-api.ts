@@ -63,9 +63,9 @@ export async function notifyHospitalAdmins(
 ) {
   const admins = await prisma.user.findMany({
     where: { hospitalId, role: "HOSPITAL_ADMIN", status: "ACTIVE" },
-    select: { id: true },
+    select: { id: true, name: true, email: true },
   });
-  if (admins.length === 0) return;
+  if (admins.length === 0) return admins;
   await prisma.notification.createMany({
     data: admins.map((admin) => ({
       userId: admin.id,
@@ -75,6 +75,21 @@ export async function notifyHospitalAdmins(
       link: notification.link,
     })),
   });
+  return admins;
+}
+
+export async function hospitalEmailNotificationsEnabled(hospitalId: string): Promise<boolean> {
+  const record = await prisma.hospitalSettings.findUnique({ where: { hospitalId }, select: { configJson: true } });
+  if (!record) return false;
+  try {
+    const value: unknown = JSON.parse(record.configJson);
+    if (!value || typeof value !== "object") return false;
+    const notifications = (value as { notifications?: unknown }).notifications;
+    return Boolean(notifications && typeof notifications === "object" && (notifications as { email?: unknown }).email === true);
+  } catch (error) {
+    console.error("[hospital-notifications] saved settings could not be read", error);
+    return false;
+  }
 }
 
 export async function notifySavedHospitalUsers(

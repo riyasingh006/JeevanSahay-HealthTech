@@ -55,7 +55,7 @@ export default function HospitalAnalyticsPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Analytics & Reports"
-        description="All calculations are derived from the centralized live dataset."
+        description="Metrics are calculated from this hospital’s persisted records."
         icon={BarChart3}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -77,8 +77,7 @@ export default function HospitalAnalyticsPage() {
       />
 
       <LiveRecordsNotice>
-        Charts and percentages are computed from live data. The print-friendly
-        report uses the browser print stylesheet.
+        Charts and percentages are computed from the current hospital records, not an external hospital system. The print-friendly report uses the browser print stylesheet.
       </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -146,7 +145,7 @@ export default function HospitalAnalyticsPage() {
             ))}
           </div>
         </SectionCard>
-        <SectionCard title="Doctor Availability Summary" description="Counts from live roster">
+        <SectionCard title="Doctor Availability Summary" description="Counts from the hospital roster">
           <div className="grid grid-cols-2 gap-2">
             <Card className="border-slate-200"><CardContent className="p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Available</p><p className="text-xl font-bold text-india-600">{docCounts.available}</p></CardContent></Card>
             <Card className="border-slate-200"><CardContent className="p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Limited</p><p className="text-xl font-bold text-saffron-700">{docCounts.limited}</p></CardContent></Card>
@@ -167,7 +166,7 @@ export default function HospitalAnalyticsPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Emergency Case Trends" description="live distribution by severity and current status">
+      <SectionCard title="Emergency Case Trends" description="Distribution of recorded cases by severity and status">
         <div className="grid gap-3 md:grid-cols-4">
           <Card className="border-slate-200"><CardContent className="p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Critical</p><p className="text-xl font-bold text-red-700">{emergencyCases.filter((e) => e.severity === "CRITICAL").length}</p></CardContent></Card>
           <Card className="border-slate-200"><CardContent className="p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Urgent</p><p className="text-xl font-bold text-saffron-700">{emergencyCases.filter((e) => e.severity === "URGENT").length}</p></CardContent></Card>

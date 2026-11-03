@@ -167,6 +167,14 @@ export function HospitalPortalProvider({ children }: { children: React.ReactNode
     void refresh();
   }, [refresh]);
 
+  React.useEffect(() => {
+    if (!data.settings.display.autoRefresh) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [data.settings.display.autoRefresh, refresh]);
+
   const mutate = React.useCallback(async (path: string, method: string, body?: unknown): Promise<MutationResult> => {
     try {
       const response = await fetch(path, {

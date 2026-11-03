@@ -109,22 +109,22 @@ export default function PatientDashboardPage() {
           icon: Building2,
           tone: styles.qaBlue,
           value: String(data.cards.nearbyHospitals),
-          label: "Verified Hospitals",
-          support: "All verified",
+          label: "Hospital Listings",
+          support: "Verified facility profiles",
         },
         {
           icon: BedDouble,
           tone: styles.qaTeal,
           value: String(bedsAvailable),
-          label: "Beds Available Nearby",
-          support: "Many options available",
+          label: "Reported Available Beds",
+          support: "Facility-reported; call to confirm",
         },
         {
           icon: Siren,
           tone: styles.qaRed,
           value: String(data.cards.emergencyFacilities),
-          label: "Emergency Facilities",
-          support: "Active & ready",
+          label: "Facilities with Emergency Services Listed",
+          support: "Call to confirm before travelling",
         },
         {
           icon: Bookmark,
@@ -167,8 +167,8 @@ export default function PatientDashboardPage() {
     },
     {
       href: "/dashboard/beds",
-      title: "Check Bed Availability",
-      desc: "View available beds",
+      title: "View Reported Bed Counts",
+      desc: "Confirm directly with the facility",
       Icon: BedDouble,
       tone: styles.qaPurple,
     },
@@ -177,7 +177,7 @@ export default function PatientDashboardPage() {
   const aiRows = [
     {
       href: "/dashboard/hospitals",
-      title: "Find the best hospital nearby",
+      title: "Compare nearby hospital listings",
       Icon: HeartPulse,
       tone: "#eaf1fe",
       color: "#2563eb",
@@ -218,8 +218,7 @@ export default function PatientDashboardPage() {
               Your health, simplified with intelligent care navigation.
             </p>
             <p className={styles.heroSupport}>
-              Find hospitals, doctors, emergency care and healthcare services
-              around you.
+              Find hospital and doctor listings, facility-reported services, and emergency guidance around you.
             </p>
             <span className={styles.statusPill}>
               <span className={styles.pillDot} aria-hidden />
@@ -591,7 +590,7 @@ export default function PatientDashboardPage() {
             <div>
               <p className={styles.emergTitle}>Need Emergency Care?</p>
               <p className={styles.emergSub}>
-                Find the nearest emergency facility instantly.
+                Browse nearby emergency-facility listings; call the facility to confirm capacity.
               </p>
             </div>
           </div>

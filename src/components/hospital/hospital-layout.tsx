@@ -26,6 +26,7 @@ import { useAuth } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
 import { HospitalPortalProvider, useHospitalPortal } from "@/components/hospital/hospital-store";
 import { HospitalDataBadge } from "@/components/hospital/hospital-ui";
+import { DemoAccountNotice } from "@/components/ui/data-source";
 
 function HospitalBrand({ plain = false }: { plain?: boolean }) {
   return (
@@ -145,7 +146,7 @@ export default function HospitalLayout({ children }: { children: React.ReactNode
   }
 
   function HospitalShell() {
-    const { notifications, loading: dataLoading, error, refresh } = useHospitalPortal();
+    const { notifications, settings, loading: dataLoading, error, refresh } = useHospitalPortal();
     const unread = notifications.filter((item) => !item.read).length;
 
     return (
@@ -246,7 +247,8 @@ export default function HospitalLayout({ children }: { children: React.ReactNode
             </div>
           </header>
 
-          <main id="main-content" className="mx-auto max-w-7xl px-4 py-6 pb-16 sm:px-6 md:py-8 lg:px-8">
+          <main id="main-content" className={`mx-auto max-w-7xl ${settings.display.density === "compact" ? "px-3 py-4 pb-12 sm:px-4 md:py-5 lg:px-6" : "px-4 py-6 pb-16 sm:px-6 md:py-8 lg:px-8"}`}>
+            {user?.isDemo && <DemoAccountNotice audience="hospital" />}
             {error ? (
               <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                 <span>Hospital records could not be loaded: {error}</span>

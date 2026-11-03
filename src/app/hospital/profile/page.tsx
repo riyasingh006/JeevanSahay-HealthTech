@@ -41,7 +41,7 @@ export default function HospitalProfilePage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Hospital Profile"
-        description="View and edit hospital details using live data."
+        description="View and edit the details stored for this verified hospital."
         icon={Building2}
         actions={
           editing ? (

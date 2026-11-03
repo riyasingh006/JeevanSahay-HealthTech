@@ -30,6 +30,7 @@ model User {
   emergencyPhone String?
   sharePin       String? // 6-digit code controlling access to Digital Health Profile via QR
   status         String   @default("ACTIVE") // ACTIVE | PENDING_VERIFICATION | SUSPENDED
+  isDemo         Boolean  @default(false)
   emailVerifiedAt DateTime?
   googleSubject  String?  @unique
   authVersion    Int      @default(0)
@@ -111,6 +112,7 @@ model Hospital {
   shortName          String?
   type               String   @default("PRIVATE") // GOVERNMENT | PRIVATE | TRUST | PSU
   status             String   @default("PENDING_VERIFICATION") // PENDING_VERIFICATION | VERIFIED | REJECTED
+  isDemo             Boolean  @default(false)
   registrationNumber String?
   addressLine        String
   city               String

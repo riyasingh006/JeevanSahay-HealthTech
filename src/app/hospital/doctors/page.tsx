@@ -157,7 +157,7 @@ export default function HospitalDoctorsPage() {
       </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Doctors" value={counts.total} hint="In live roster" icon={Stethoscope} tone="blue" />
+        <StatCard label="Total Doctors" value={counts.total} hint="In hospital roster" icon={Stethoscope} tone="blue" />
         <StatCard label="Available" value={counts.available} hint="Ready for duty" icon={UserRoundCheck} tone="green" />
         <StatCard label="Limited" value={counts.limited} hint="Partial availability" icon={Stethoscope} tone="amber" />
         <StatCard label="Unavailable" value={counts.unavailable} hint="Off-duty / leave" icon={Stethoscope} tone="red" />

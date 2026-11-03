@@ -11,6 +11,7 @@ export const GET = withApi(async () => {
       email: session.email,
       role: session.role,
       hospitalId: session.hospitalId ?? null,
+      isDemo: session.isDemo ?? false,
     },
   });
 });

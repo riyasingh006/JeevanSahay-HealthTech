@@ -26,6 +26,7 @@ import Image from "next/image";
 import logoAsset from "@/components/landing/logo/3af76e7bd07c86d6e6e08b17eef080c0.jpg";
 import { useAuth } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
+import { DemoAccountNotice } from "@/components/ui/data-source";
 
 /** Dashboard-local brand lockup — uses the official Jeevan Sahay logo asset. */
 function DashboardBrand({ plain = false }: { plain?: boolean }) {
@@ -319,6 +320,7 @@ export default function DashboardLayout({
         </header>
 
         <main id="main-content" className="container py-6 pb-16 md:py-8">
+          {user?.isDemo && <DemoAccountNotice audience="patient" />}
           {children}
         </main>
       </div>

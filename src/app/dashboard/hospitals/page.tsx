@@ -487,7 +487,7 @@ function FindHospitalsClient() {
       <header>
         <h1 className="institutional-heading text-2xl">Find Hospitals</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Verified hospitals near you — compare availability before you travel.
+          Verified hospital listings near you. Bed, doctor, and service information is facility-reported; call to confirm before travelling.
         </p>
       </header>
 

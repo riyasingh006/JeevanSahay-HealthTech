@@ -73,7 +73,7 @@ export default function HospitalAppointmentsPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Appointments"
-        description="Manage live appointments with references, doctors, departments, time and status updates."
+        description="Manage current appointment requests with references, doctors, departments, times and status updates."
         icon={CalendarClock}
       />
 

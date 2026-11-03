@@ -85,7 +85,7 @@ export async function sendHospitalApplicationDecisionEmail(input: {
   const recipient = escapeHtml(input.name || "there");
   const hospital = escapeHtml(input.hospitalName);
   const reason = escapeHtml(input.reason || "No additional details were provided.");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000";
   const link = approved ? `${appUrl.replace(/\/$/, "")}/hospital` : `${appUrl.replace(/\/$/, "")}/login?reason=hospital-rejected`;
   const subject = approved ? "Hospital application approved — Jeevan Sahay" : "Hospital application decision — Jeevan Sahay";
   const text = approved
@@ -100,5 +100,49 @@ export async function sendHospitalApplicationDecisionEmail(input: {
     subject,
     text,
     html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#16202e"><h2 style="color:#173b70">Jeevan Sahay</h2><p>Hello ${recipient},</p>${body}</div>`,
+  });
+}
+
+export async function sendPortalNoticeEmail(input: {
+  to: string;
+  name?: string;
+  subject: string;
+  paragraphs: string[];
+  actionPath?: string;
+  actionLabel?: string;
+}): Promise<void> {
+  const config = smtpConfig();
+  const name = input.name?.trim() || "there";
+  const subject = input.subject.replace(/[\r\n]+/g, " ").slice(0, 180);
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL;
+  let actionUrl: string | undefined;
+  if (baseUrl && input.actionPath?.startsWith("/")) {
+    try {
+      const parsed = new URL(baseUrl);
+      if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+        actionUrl = new URL(input.actionPath, parsed).toString();
+      }
+    } catch {
+      actionUrl = undefined;
+    }
+  }
+  const text = [
+    `Hello ${name},`,
+    "",
+    ...input.paragraphs,
+    ...(actionUrl && input.actionLabel ? ["", `${input.actionLabel}: ${actionUrl}`] : []),
+    "",
+    "Jeevan Sahay",
+  ].join("\n");
+  const paragraphs = input.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("");
+  const action = actionUrl && input.actionLabel
+    ? `<p><a href="${escapeHtml(actionUrl)}">${escapeHtml(input.actionLabel)}</a></p>`
+    : "";
+  await nodemailer.createTransport(config).sendMail({
+    from: process.env.SMTP_FROM,
+    to: input.to,
+    subject,
+    text,
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#16202e"><h2 style="color:#173b70">Jeevan Sahay</h2><p>Hello ${escapeHtml(name)},</p>${paragraphs}${action}</div>`,
   });
 }

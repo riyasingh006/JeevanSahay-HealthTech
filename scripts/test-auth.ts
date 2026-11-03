@@ -13,6 +13,7 @@ import {
   type BedInventoryRecord,
   type BedRecord,
 } from "../src/lib/hospital/hospital-data";
+import { LlmCallError, streamAiReply } from "../src/lib/llm";
 
 const root = process.cwd();
 const tempDir = mkdtempSync(path.join(os.tmpdir(), "jeevan-sahay-auth-"));
@@ -102,8 +103,11 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv = process.e
   }
 }
 
+let requestSequence = 0;
+
 async function request(pathname: string, method = "GET", body?: unknown, cookie?: string) {
   const headers = new Headers({ Accept: "application/json" });
+  headers.set("x-forwarded-for", `198.51.100.${(requestSequence++ % 250) + 1}`);
   if (body !== undefined) headers.set("Content-Type", "application/json");
   if (cookie) headers.set("Cookie", cookie);
   const response = await fetch(`${baseUrl}${pathname}`, {
@@ -436,6 +440,104 @@ async function main() {
       lng: 77.21,
     },
   });
+  const publicStatsBeforeDemo = await request("/api/meta/stats");
+  assert.equal(publicStatsBeforeDemo.response.status, 200);
+  const demoHospital = await prisma.hospital.create({
+    data: {
+      name: "Jeevan Sahay Phase6 Demo Fixture Hospital",
+      type: "PRIVATE",
+      status: "VERIFIED",
+      isDemo: true,
+      verifiedBy: "seed-fixture",
+      addressLine: "Sample Lane",
+      city: "New Delhi",
+      state: "Delhi",
+      pincode: "110001",
+      phone: "",
+      lat: 28.6139,
+      lng: 77.2090,
+    },
+  });
+  await prisma.bedInventory.create({
+    data: { hospitalId: demoHospital.id, category: "GENERAL", total: 20, available: 10 },
+  });
+  const demoDoctor = await prisma.doctor.create({
+    data: {
+      name: "Dr Phase6 Demo Fixture Specialist",
+      specialty: "CARDIOLOGY",
+      qualification: "MBBS",
+      availability: "AVAILABLE",
+      hospitalId: demoHospital.id,
+    },
+  });
+  const demoPatientEmail = testEmail("phase6-demo-patient");
+  const demoPatientPassword = "TestOnly!Demo123";
+  await prisma.user.create({
+    data: {
+      name: "Phase 6 Demo Patient",
+      email: demoPatientEmail,
+      passwordHash: await bcrypt.hash(demoPatientPassword, 12),
+      role: "PATIENT",
+      status: "ACTIVE",
+      isDemo: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+  const demoPatientLogin = await request("/api/auth/login", "POST", {
+    email: demoPatientEmail,
+    password: demoPatientPassword,
+  });
+  assert.equal(demoPatientLogin.response.status, 200, JSON.stringify(demoPatientLogin.json));
+  const demoPatientCookie = cookieFrom(demoPatientLogin.response, "js_session");
+  const demoAccountInfo = await request("/api/auth/me", "GET", undefined, demoPatientCookie);
+  assert.equal(demoAccountInfo.json.data.user.isDemo, true);
+  const demoAppointmentPayload = {
+    hospitalId: demoHospital.id,
+    doctorId: demoDoctor.id,
+    patientName: "Demo Patient",
+    patientPhone: "+91 0000000000",
+    date: futureDateInIndia(),
+    time: "10:00 AM",
+  };
+  const demoBooking = await request("/api/appointments", "POST", demoAppointmentPayload, demoPatientCookie);
+  assert.equal(demoBooking.response.status, 403);
+  const sampleHospitalBooking = await request("/api/appointments", "POST", demoAppointmentPayload, patientSessionCookie);
+  assert.equal(sampleHospitalBooking.response.status, 404);
+  const demoReview = await request(`/api/hospitals/${encodeURIComponent(demoHospital.id)}/reviews`, "POST", { rating: 5, comment: "Synthetic sample review" }, demoPatientCookie);
+  assert.equal(demoReview.response.status, 403);
+  const regularDemoReview = await request(`/api/hospitals/${encodeURIComponent(demoHospital.id)}/reviews`, "POST", { rating: 5, comment: "Synthetic sample review" }, patientSessionCookie);
+  assert.equal(regularDemoReview.response.status, 404);
+
+  const sampleSearchUrl = `/api/hospitals/search?q=${encodeURIComponent(demoHospital.name)}&lat=28.6139&lng=77.209&maxDistance=50`;
+  const normalPatientSearch = await request(sampleSearchUrl, "GET", undefined, patientSessionCookie);
+  assert.equal(normalPatientSearch.response.status, 200, JSON.stringify(normalPatientSearch.json));
+  assert.ok(!normalPatientSearch.json.data.results.some((item: { hospital: { id: string } }) => item.hospital.id === demoHospital.id));
+  const demoPatientSearch = await request(sampleSearchUrl, "GET", undefined, demoPatientCookie);
+  assert.equal(demoPatientSearch.response.status, 200, JSON.stringify(demoPatientSearch.json));
+  const demoSearchResult = demoPatientSearch.json.data.results.find((item: { hospital: { id: string } }) => item.hospital.id === demoHospital.id);
+  assert.equal(demoSearchResult?.hospital.isDemo, true);
+
+  const doctorSearchUrl = `/api/doctors?q=${encodeURIComponent(demoDoctor.name)}`;
+  const normalDoctorSearch = await request(doctorSearchUrl, "GET", undefined, patientSessionCookie);
+  assert.equal(normalDoctorSearch.response.status, 200, JSON.stringify(normalDoctorSearch.json));
+  assert.ok(!normalDoctorSearch.json.data.doctors.some((item: { id: string }) => item.id === demoDoctor.id));
+  const demoDoctorSearch = await request(doctorSearchUrl, "GET", undefined, demoPatientCookie);
+  assert.equal(demoDoctorSearch.response.status, 200, JSON.stringify(demoDoctorSearch.json));
+  assert.equal(demoDoctorSearch.json.data.doctors.find((item: { id: string }) => item.id === demoDoctor.id)?.hospital.isDemo, true);
+
+  const regularDemoDetail = await request(`/api/hospitals/${encodeURIComponent(demoHospital.id)}`, "GET", undefined, patientSessionCookie);
+  const sampleDemoDetail = await request(`/api/hospitals/${encodeURIComponent(demoHospital.id)}`, "GET", undefined, demoPatientCookie);
+  assert.equal(regularDemoDetail.response.status, 404);
+  assert.equal(sampleDemoDetail.response.status, 200);
+  assert.equal(sampleDemoDetail.json.data.hospital.isDemo, true);
+
+  const publicStatsAfterDemo = await request("/api/meta/stats");
+  assert.equal(publicStatsAfterDemo.response.status, 200);
+  for (const key of ["hospitals", "totalBeds", "doctors", "registeredUsers"]) {
+    assert.equal(publicStatsAfterDemo.json.data[key], publicStatsBeforeDemo.json.data[key], `demo data changed public stat ${key}`);
+  }
+  console.log("PASS demo facilities, doctors, accounts, and public statistics preserve source boundaries");
+
   const hospitalAdminPassword = "TestOnly!Hospital123";
   const hospitalAdminEmail = testEmail("hospital-admin-primary");
   const secondHospitalAdminEmail = testEmail("hospital-admin-secondary");
@@ -785,16 +887,20 @@ async function main() {
   assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: legacyRejectAdmin.id } })).authVersion, legacyRejectAdmin.authVersion + 1);
   console.log("PASS legacy hospital verification activates only verified, non-suspended admins and revokes sessions on decision");
 
-  const report = await prisma.report.create({
-    data: {
-      category: "DATA_ISSUE",
-      subject: "Admin integration test report",
-      message: "This report tests the administrative review queue and audited resolution workflow.",
-      reporterName: "Test Reporter",
-      contactEmail: testEmail("reporter"),
-      relatedHospital: "Test General Hospital",
-    },
+  const reporterEmail = testEmail("reporter");
+  const beforeReportEmail = messages.length;
+  const reportSubmission = await request("/api/reports", "POST", {
+    category: "DATA_ISSUE",
+    subject: "Admin integration test report",
+    message: "This report tests the administrative review queue and audited resolution workflow.",
+    reporterName: "Test Reporter",
+    contactEmail: reporterEmail,
+    relatedHospital: "Test General Hospital",
   });
+  assert.equal(reportSubmission.response.status, 201, JSON.stringify(reportSubmission.json));
+  assert.equal(reportSubmission.json.data.emailDelivery, "sent");
+  assert.equal(messages.length, beforeReportEmail + 1);
+  const report = await prisma.report.findUniqueOrThrow({ where: { id: reportSubmission.json.data.reportId } });
   const reportList = await request("/api/admin/reports?status=ALL&q=Admin%20integration", "GET", undefined, adminCookie);
   assert.equal(reportList.response.status, 200, JSON.stringify(reportList.json));
   assert.ok(reportList.json.data.reports.some((item: { id: string }) => item.id === report.id));
@@ -806,12 +912,15 @@ async function main() {
     status: "RESOLVED",
   }, adminCookie);
   assert.equal(closeWithoutNote.response.status, 422);
+  const beforeStatusEmail = messages.length;
   const markInReview = await request("/api/admin/reports", "PATCH", {
     reportId: report.id,
     expectedStatus: "OPEN",
     status: "IN_REVIEW",
   }, adminCookie);
   assert.equal(markInReview.response.status, 200, JSON.stringify(markInReview.json));
+  assert.equal(markInReview.json.data.emailDelivery, "sent");
+  assert.equal(messages.length, beforeStatusEmail + 1);
   const staleReportUpdate = await request("/api/admin/reports", "PATCH", {
     reportId: report.id,
     expectedStatus: "OPEN",
@@ -827,6 +936,7 @@ async function main() {
   }, adminCookie);
   assert.equal(resolveReport.response.status, 200, JSON.stringify(resolveReport.json));
   assert.equal(resolveReport.json.data.report.status, "RESOLVED");
+  assert.equal(resolveReport.json.data.emailDelivery, "sent");
   const reportAuditEntries = await request(`/api/admin/audit?action=REPORT_STATUS_CHANGED&q=${encodeURIComponent(report.id)}`, "GET", undefined, adminCookie);
   assert.equal(reportAuditEntries.response.status, 200, JSON.stringify(reportAuditEntries.json));
   assert.ok(reportAuditEntries.json.data.total >= 2);
@@ -943,7 +1053,16 @@ async function main() {
   const emergencyId = emergencyResponse.json.data.emergencyCase.id as string;
   const emergencyStatus = await request(`/api/hospital/emergencies/${encodeURIComponent(emergencyId)}`, "PATCH", { status: "IN_TREATMENT" }, hospitalCookie);
   assert.equal(emergencyStatus.response.status, 200);
+  const defaultHospitalSettings = await request("/api/hospital/settings", "GET", undefined, hospitalCookie);
+  assert.equal(defaultHospitalSettings.response.status, 200);
+  assert.equal(defaultHospitalSettings.json.data.settings.notifications.email, false);
+  const enabledEmailSettings = await request("/api/hospital/settings", "PATCH", {
+    ...defaultHospitalSettings.json.data.settings,
+    notifications: { ...defaultHospitalSettings.json.data.settings.notifications, email: true },
+  }, hospitalCookie);
+  assert.equal(enabledEmailSettings.response.status, 200, JSON.stringify(enabledEmailSettings.json));
 
+  const beforeAppointmentEmail = messages.length;
   const requestFromPatient = await request("/api/appointments", "POST", {
     hospitalId: appointmentHospital.id,
     doctorId,
@@ -953,6 +1072,8 @@ async function main() {
     time: "12:30 PM",
   }, patientSessionCookie);
   assert.equal(requestFromPatient.response.status, 201, JSON.stringify(requestFromPatient.json));
+  assert.equal(requestFromPatient.json.data.emailDelivery, "sent");
+  assert.equal(messages.length, beforeAppointmentEmail + 1);
   const hospitalAlert = await prisma.notification.findFirst({
     where: { userId: hospitalAdmin.id, title: "New appointment request" },
   });
@@ -967,12 +1088,16 @@ async function main() {
   assert.equal(superAdminHospitalDenied.response.status, 403);
 
   const hospitalAppointmentId = requestFromPatient.json.data.appointment.id as string;
+  const beforePatientStatusEmail = messages.length;
   const confirmed = await request("/api/hospital/appointments", "PATCH", {
     appointmentId: hospitalAppointmentId,
     status: "CONFIRMED",
     note: "Please arrive 15 minutes early.",
   }, hospitalCookie);
   assert.equal(confirmed.response.status, 200);
+  assert.equal(confirmed.json.data.emailDelivery, "sent");
+  assert.equal(messages.length, beforePatientStatusEmail + 1);
+  assert.ok(!messages.at(-1)?.includes("+91 9810012345"));
   const patientAppointmentAlert = await prisma.notification.findFirst({
     where: { userId: (await prisma.user.findUniqueOrThrow({ where: { email: patientEmail } })).id, title: "Appointment confirmed" },
   });
@@ -1062,6 +1187,37 @@ async function main() {
   assert.equal(oauthCallback.status, 307);
   assert.ok(oauthCallback.headers.get("location")?.includes("error=google_state_mismatch"));
   console.log("PASS Google OAuth initiation uses PKCE and rejects a mismatched state");
+
+  await new Promise<void>((resolve, reject) => {
+    if (!smtpServer?.listening) return resolve();
+    smtpServer.close((error) => error ? reject(error) : resolve());
+  });
+  const outageReport = await request("/api/reports", "POST", {
+    category: "OTHER",
+    subject: "Notification outage integration check",
+    message: "This report must persist even when SMTP is unavailable.",
+    contactEmail: testEmail("outage-reporter"),
+  });
+  assert.equal(outageReport.response.status, 201, JSON.stringify(outageReport.json));
+  assert.equal(outageReport.json.data.emailDelivery, "failed");
+  assert.ok(await prisma.report.findUnique({ where: { id: outageReport.json.data.reportId } }));
+  const savedGeminiKey = process.env.GEMINI_API_KEY;
+  const savedOpenAiKey = process.env.OPENAI_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    await assert.rejects(
+      streamAiReply({ history: [{ role: "user", content: "Find a hospital." }] }),
+      (error: unknown) => error instanceof LlmCallError && error.kind === "unconfigured"
+    );
+    console.log("PASS missing AI provider credentials return an explicit unconfigured error without a mock reply");
+  } finally {
+    if (savedGeminiKey) process.env.GEMINI_API_KEY = savedGeminiKey;
+    else delete process.env.GEMINI_API_KEY;
+    if (savedOpenAiKey) process.env.OPENAI_API_KEY = savedOpenAiKey;
+    else delete process.env.OPENAI_API_KEY;
+  }
+  console.log("PASS appointment and report emails are captured; SMTP failure does not roll back reports or fake delivery success");
 }
 
 main()
