@@ -34,10 +34,20 @@
 | 9. Testing/bug fixing | Establish and run automated unit/integration coverage, authorization tests, and frontend/backend checks across the app. | All repository checks pass; accurately list any provider-dependent tests not executable here. |
 | 10. Render preparation | Configure the existing app/database deployment, environment-variable guide, Google/email setup, production cookies/CORS/origins, and safe migration/deploy commands. | Validate production build/start configuration and document exact Render settings without exposing secrets. |
 
+## Phase 3 implementation (completed)
+
+- Replaced the hospital demo provider with a session-backed provider that loads records only for the verified hospital on the authenticated session; preserved the existing shell and page design.
+- Added itemised beds, departments, emergency cases, and persisted settings. Existing hospital, doctor, service, and appointment records remain intact; public bed totals are updated transactionally.
+- Added hospital-scoped APIs for portal summary, beds, doctors, departments, services, appointments, emergencies, profile, settings, and notifications. Writes validate tenant ownership and state transitions and create audit records.
+- Removed fictional readiness and occupancy claims from hospital pages. Added case logging with non-identifying input guidance and truthful empty/loading/error states. Analytics use recorded appointments and emergency cases only.
+- Verified two-hospital isolation, role denial, persistence, appointment/emergency actions, patient-facing inventory updates, and itemised bed accounting through the disposable SQLite + local SMTP test harness.
+
 ## Current status
 
 - Phase 0 inspection and implementation plan: complete.
-- Phase 1 authentication: complete and verified; commit `3d882c1`.
-- Phase 2 Patient Portal: complete and tested. Added patient-only access checks, location-aware dashboard ranking, patient search history, verified-only saved-hospital views, and database-backed appointment requests/cancellation with a patient appointments page. The existing portal design remains intact.
-- Phase 2 verification: `npm run test:auth` passes 13 end-to-end checks against a disposable SQLite database and local SMTP capture server; `npm run typecheck` passes; `npm run lint` exits successfully with 18 existing unused-variable warnings in unrelated hospital/shared components; `npm run build` succeeds. Phase 1's patient and hospital client shells were preserved byte-for-byte while adding server-side role/session guards.
-- No user database was seeded or migrated. Google and email providers were exercised with local test credentials/capture only; production Google and SMTP delivery still require owner credentials. Phase 2 is ready to commit.
+- Phase 1 Authentication: complete and verified; commit `3d882c1`.
+- Phase 2 Patient Portal: complete and verified; commit `bd8e55a`. Added patient-only API access checks, location-aware ranking, private search history, verified-only saved-hospital views, and persisted appointment requests/cancellation. Existing portal shell markup was preserved byte-for-byte.
+- Phase 1/2 verification: the disposable-database/local-SMTP integration suite passes; `npm run typecheck` passes; `npm run lint` succeeds with existing unused-variable warnings; Prisma validation and production build pass. No user database was seeded or migrated. Production Google and SMTP delivery still require the owner’s credentials.
+- Phase 3 Hospital Portal: implementation and verification complete. Replaced the in-memory demo provider with verified-hospital-scoped database loading and mutations across dashboard, beds, doctors, departments, appointments, emergency cases, services, profile, settings, notifications, and analytics. Existing page layout was retained; fake capacity/readiness figures were removed; itemised beds update patient-facing aggregates transactionally; appointment and emergency status changes are validated; writes are audited and isolated by hospital.
+- Phase 3 verification: 17 disposable-database/local-SMTP integration checks pass, including cross-hospital isolation, patient-facing bed/service updates, appointment workflows, emergency records, settings/profile persistence, and role denials. `npm run typecheck`, `npm run lint` (11 existing warnings), `prisma validate`, and the production build pass. No real database was seeded or migrated.
+- Next: Phase 4 adds the admin interface for hospital verification/rejection, account management, complaints/reports, analytics, exports, and audit review. Hospital applications remain pending and cannot access the portal until that approval workflow exists.

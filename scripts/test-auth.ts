@@ -6,6 +6,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import {
+  bedInventoryByType,
+  bedInventoryCounts,
+  availableBedsByType,
+  type BedInventoryRecord,
+  type BedRecord,
+} from "../src/lib/hospital/hospital-data";
 
 const root = process.cwd();
 const tempDir = mkdtempSync(path.join(os.tmpdir(), "jeevan-sahay-auth-"));
@@ -229,6 +236,24 @@ async function closeApp() {
 }
 
 async function main() {
+  const inventoryFixture: BedInventoryRecord[] = [{ category: "ICU", total: 10, available: 4 }];
+  const bedFixture: BedRecord[] = [
+    { id: "i1", ward: "ICU-A", bedType: "ICU", department: "ICU", status: "RESERVED", updatedAt: "2026-11-03T00:00:00.000Z" },
+    { id: "i2", ward: "ICU-A", bedType: "ICU", department: "ICU", status: "MAINTENANCE", updatedAt: "2026-11-03T00:00:00.000Z" },
+    { id: "i3", ward: "ICU-A", bedType: "ICU", department: "ICU", status: "OCCUPIED", updatedAt: "2026-11-03T00:00:00.000Z" },
+    { id: "g1", ward: "General-A", bedType: "GENERAL", department: "General", status: "AVAILABLE", updatedAt: "2026-11-03T00:00:00.000Z" },
+  ];
+  assert.deepEqual(bedInventoryCounts(inventoryFixture, bedFixture), {
+    total: 10,
+    available: 4,
+    occupied: 4,
+    reserved: 1,
+    maintenance: 1,
+  });
+  assert.equal(bedInventoryByType(inventoryFixture, bedFixture)[0].occupied, 4);
+  assert.equal(availableBedsByType(inventoryFixture, bedFixture, "ICU"), 4);
+  console.log("PASS itemised bed reservations and maintenance are excluded from occupancy");
+
   const setupEnv: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: "test",
@@ -396,6 +421,46 @@ async function main() {
       lng: 77.2090,
     },
   });
+  const secondHospital = await prisma.hospital.create({
+    data: {
+      name: "Isolation Test Hospital",
+      type: "TRUST",
+      status: "VERIFIED",
+      registrationNumber: "TEST-ISOLATION-HOSPITAL",
+      addressLine: "2 Test Health Road",
+      city: "New Delhi",
+      state: "Delhi",
+      pincode: "110001",
+      phone: "+91 1100012000",
+      lat: 28.62,
+      lng: 77.21,
+    },
+  });
+  const hospitalAdminPassword = "TestOnly!Hospital123";
+  const hospitalAdminEmail = testEmail("hospital-admin-primary");
+  const secondHospitalAdminEmail = testEmail("hospital-admin-secondary");
+  const hospitalAdmin = await prisma.user.create({
+    data: {
+      name: "Hospital Admin A",
+      email: hospitalAdminEmail,
+      passwordHash: await bcrypt.hash(hospitalAdminPassword, 12),
+      role: "HOSPITAL_ADMIN",
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+      hospitalId: appointmentHospital.id,
+    },
+  });
+  await prisma.user.create({
+    data: {
+      name: "Hospital Admin B",
+      email: secondHospitalAdminEmail,
+      passwordHash: await bcrypt.hash(hospitalAdminPassword, 12),
+      role: "HOSPITAL_ADMIN",
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+      hospitalId: secondHospital.id,
+    },
+  });
   const appointmentDoctor = await prisma.doctor.create({
     data: {
       hospitalId: appointmentHospital.id,
@@ -539,6 +604,157 @@ async function main() {
   const adminLogin = await request("/api/auth/login", "POST", { email: adminEmail, password: adminPassword });
   assert.equal(adminLogin.response.status, 200, JSON.stringify(adminLogin.json));
   const adminCookie = cookieFrom(adminLogin.response, "js_session");
+  const verifiedHospitalLogin = await request("/api/auth/login", "POST", { email: hospitalAdminEmail, password: hospitalAdminPassword });
+  const secondHospitalLogin = await request("/api/auth/login", "POST", { email: secondHospitalAdminEmail, password: hospitalAdminPassword });
+  assert.equal(verifiedHospitalLogin.response.status, 200, JSON.stringify(verifiedHospitalLogin.json));
+  assert.equal(secondHospitalLogin.response.status, 200, JSON.stringify(secondHospitalLogin.json));
+  const hospitalCookie = cookieFrom(verifiedHospitalLogin.response, "js_session");
+  const secondHospitalCookie = cookieFrom(secondHospitalLogin.response, "js_session");
+  const portalA = await request("/api/hospital/portal", "GET", undefined, hospitalCookie);
+  const portalB = await request("/api/hospital/portal", "GET", undefined, secondHospitalCookie);
+  assert.equal(portalA.response.status, 200);
+  assert.equal(portalA.json.data.hospital.id, appointmentHospital.id);
+  assert.equal(portalB.json.data.hospital.id, secondHospital.id);
+  assert.equal(portalB.json.data.doctors.length, 0);
+  assert.equal(portalB.json.data.beds.length, 0);
+
+  const departmentResponse = await request("/api/hospital/departments", "POST", {
+    name: "Cardiology",
+    head: "Dr. Test Specialist",
+    status: "ACTIVE",
+    location: "North Wing",
+    description: "Cardiac care unit",
+  }, hospitalCookie);
+  assert.equal(departmentResponse.response.status, 201, JSON.stringify(departmentResponse.json));
+  const departmentId = departmentResponse.json.data.department.id as string;
+  const doctorResponse = await request("/api/hospital/doctors", "POST", {
+    name: "Dr. Hospital Portal",
+    specialty: "Cardiology",
+    department: "Cardiology",
+    qualification: "MD",
+    experienceYears: 12,
+    availability: "AVAILABLE",
+    timings: "09:00-17:00",
+    phone: "+91 9810012345",
+    email: "doctor@example.test",
+  }, hospitalCookie);
+  assert.equal(doctorResponse.response.status, 201, JSON.stringify(doctorResponse.json));
+  const doctorId = doctorResponse.json.data.doctor.id as string;
+  const bedResponse = await request("/api/hospital/beds", "POST", {
+    id: "A-ICU-01",
+    ward: "Critical Care",
+    bedType: "ICU",
+    department: "Cardiology",
+    status: "AVAILABLE",
+  }, hospitalCookie);
+  assert.equal(bedResponse.response.status, 201, JSON.stringify(bedResponse.json));
+  const duplicateBed = await request("/api/hospital/beds", "POST", {
+    id: "A-ICU-01",
+    ward: "Critical Care",
+    bedType: "ICU",
+    department: "Cardiology",
+    status: "AVAILABLE",
+  }, hospitalCookie);
+  assert.equal(duplicateBed.response.status, 409);
+  const publicHospital = await request(`/api/hospitals/${encodeURIComponent(appointmentHospital.id)}`);
+  assert.equal(publicHospital.response.status, 200);
+  assert.equal(publicHospital.json.data.hospital.beds.find((item: { category: string }) => item.category === "ICU").available, 1);
+
+  const serviceResponse = await request("/api/hospital/services", "POST", {
+    name: "MRI",
+    department: "Cardiology",
+    status: "AVAILABLE",
+    hours: "24x7",
+    description: "Magnetic resonance imaging",
+  }, hospitalCookie);
+  assert.equal(serviceResponse.response.status, 201, JSON.stringify(serviceResponse.json));
+  const emergencyResponse = await request("/api/hospital/emergencies", "POST", {
+    patientRef: "Case 1",
+    age: 43,
+    condition: "Chest pain",
+    severity: "URGENT",
+    department: "Cardiology",
+    location: "Emergency bay 2",
+  }, hospitalCookie);
+  assert.equal(emergencyResponse.response.status, 201, JSON.stringify(emergencyResponse.json));
+  const emergencyId = emergencyResponse.json.data.emergencyCase.id as string;
+  const emergencyStatus = await request(`/api/hospital/emergencies/${encodeURIComponent(emergencyId)}`, "PATCH", { status: "IN_TREATMENT" }, hospitalCookie);
+  assert.equal(emergencyStatus.response.status, 200);
+
+  const requestFromPatient = await request("/api/appointments", "POST", {
+    hospitalId: appointmentHospital.id,
+    doctorId,
+    patientName: "Test Patient",
+    patientPhone: "+91 9810012345",
+    date: futureDateInIndia(),
+    time: "12:30 PM",
+  }, patientSessionCookie);
+  assert.equal(requestFromPatient.response.status, 201, JSON.stringify(requestFromPatient.json));
+  const hospitalAlert = await prisma.notification.findFirst({
+    where: { userId: hospitalAdmin.id, title: "New appointment request" },
+  });
+  assert.ok(hospitalAlert);
+  const crossHospitalDoctor = await request(`/api/hospital/doctors/${encodeURIComponent(doctorId)}`, "PATCH", { availability: "UNAVAILABLE" }, secondHospitalCookie);
+  const crossHospitalBed = await request(`/api/hospital/beds/A-ICU-01`, "PATCH", { status: "OCCUPIED" }, secondHospitalCookie);
+  const crossHospitalDepartment = await request(`/api/hospital/departments/${encodeURIComponent(departmentId)}`, "PATCH", { status: "INACTIVE" }, secondHospitalCookie);
+  assert.equal(crossHospitalDoctor.response.status, 404);
+  assert.equal(crossHospitalBed.response.status, 404);
+  assert.equal(crossHospitalDepartment.response.status, 404);
+  const superAdminHospitalDenied = await request("/api/hospital/portal", "GET", undefined, adminCookie);
+  assert.equal(superAdminHospitalDenied.response.status, 403);
+
+  const hospitalAppointmentId = requestFromPatient.json.data.appointment.id as string;
+  const confirmed = await request("/api/hospital/appointments", "PATCH", {
+    appointmentId: hospitalAppointmentId,
+    status: "CONFIRMED",
+    note: "Please arrive 15 minutes early.",
+  }, hospitalCookie);
+  assert.equal(confirmed.response.status, 200);
+  const patientAppointmentAlert = await prisma.notification.findFirst({
+    where: { userId: (await prisma.user.findUniqueOrThrow({ where: { email: patientEmail } })).id, title: "Appointment confirmed" },
+  });
+  assert.ok(patientAppointmentAlert);
+  const invalidIdentityChange = await request("/api/hospital/profile", "PATCH", {
+    name: "Appointments Test Hospital",
+    type: "PRIVATE",
+    registrationNumber: "FORGED-REGISTRATION",
+    addressLine: "3 Test Health Road",
+    city: "New Delhi",
+    state: "Delhi",
+    pincode: "110001",
+    phone: "+91 1100011000",
+    emergencyPhone: "",
+    email: "",
+    website: "",
+    accreditation: "",
+    established: 2000,
+    about: "Updated test profile",
+  }, hospitalCookie);
+  assert.equal(invalidIdentityChange.response.status, 403);
+  const validProfileChange = await request("/api/hospital/profile", "PATCH", {
+    name: "Appointments Test Hospital",
+    type: "PRIVATE",
+    registrationNumber: "TEST-APPOINTMENT-HOSPITAL",
+    addressLine: "3 Test Health Road",
+    city: "New Delhi",
+    state: "Delhi",
+    pincode: "110001",
+    phone: "+91 1100011000",
+    emergencyPhone: "",
+    email: "",
+    website: "",
+    accreditation: "",
+    established: 2000,
+    about: "Updated test profile",
+  }, hospitalCookie);
+  assert.equal(validProfileChange.response.status, 200);
+  const refreshedPublicHospital = await request(`/api/hospitals/${encodeURIComponent(appointmentHospital.id)}`);
+  assert.equal(refreshedPublicHospital.json.data.hospital.addressLine, "3 Test Health Road");
+  const hiddenHospitalPage = await fetch(`${baseUrl}/hospital`, { headers: { Cookie: adminCookie }, redirect: "manual" });
+  assert.equal(hiddenHospitalPage.status, 307);
+  console.log("PASS verified hospital admins receive isolated portal data and persisted CRUD");
+  console.log("PASS bed and service changes reach the patient directory; cross-hospital writes fail");
+  console.log("PASS appointment, emergency, profile, notifications, audit, and role protections");
   const adminAccess = await request("/api/admin/users", "GET", undefined, adminCookie);
   assert.equal(adminAccess.response.status, 200);
   const patientProfileDenied = await request("/api/user/profile", "GET", undefined, adminCookie);
@@ -570,6 +786,7 @@ async function main() {
   assert.equal(deniedRecommendation.response.status, 403);
   console.log("PASS super-admin sessions cannot call patient-only data APIs");
   console.log("PASS protected admin provisioning creates a verified admin without role promotion");
+
 
   const oauthStart = await fetch(`${baseUrl}/api/auth/google`, { redirect: "manual" });
   assert.equal(oauthStart.status, 307);

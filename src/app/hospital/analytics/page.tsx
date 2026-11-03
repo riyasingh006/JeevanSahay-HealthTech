@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { BarChart3, FileText, Printer } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   LegendDot,
   NativeSelect,
   PageHeader,
@@ -17,28 +17,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   appointmentStatusCounts,
-  availableIcuBeds,
-  bedCounts,
-  bedsByType,
+  availableBedsByType,
+  bedInventoryCounts,
+  bedInventoryByType,
   departmentBedSummary,
   doctorAvailabilityCounts,
   emergencySummary,
   serviceStatusCounts,
-} from "@/lib/hospital/demo-data";
+} from "@/lib/hospital/hospital-data";
 
 export default function HospitalAnalyticsPage() {
-  const { beds, doctors, departments, emergencyCases, services, appointments, trend } =
-    useHospitalDemo();
+  const { beds, bedInventory, doctors, departments, emergencyCases, services, appointments, trend } =
+    useHospitalPortal();
   const [range, setRange] = React.useState("30");
 
-  const bedCount = bedCounts(beds);
-  const byType = bedsByType(beds);
+  const bedCount = bedInventoryCounts(bedInventory, beds);
+  const byType = bedInventoryByType(bedInventory, beds);
   const docCounts = doctorAvailabilityCounts(doctors);
   const deptSummary = departmentBedSummary(beds, departments);
   const svcCounts = serviceStatusCounts(services);
   const aptCounts = appointmentStatusCounts(appointments);
   const erSummary = emergencySummary(emergencyCases);
-  const icuAvailable = availableIcuBeds(beds);
+  const icuAvailable = availableBedsByType(bedInventory, beds, "ICU");
   const occupancy = bedCount.total ? Math.round((bedCount.occupied / bedCount.total) * 100) : 0;
 
   const trendData = React.useMemo(() => {
@@ -55,7 +55,7 @@ export default function HospitalAnalyticsPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Analytics & Reports"
-        description="All calculations are derived from the centralized demo dataset."
+        description="All calculations are derived from the centralized live dataset."
         icon={BarChart3}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -76,17 +76,17 @@ export default function HospitalAnalyticsPage() {
         }
       />
 
-      <DemoNotice>
-        Charts and percentages are computed from demo data. The print-friendly
+      <LiveRecordsNotice>
+        Charts and percentages are computed from live data. The print-friendly
         report uses the browser print stylesheet.
-      </DemoNotice>
+      </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Bed Occupancy" value={`${occupancy}%`} hint={`${bedCount.occupied}/${bedCount.total} occupied`} icon={BarChart3} tone={occupancy >= 85 ? "red" : occupancy >= 65 ? "amber" : "green"} />
         <StatCard label="Available Beds" value={bedCount.available} hint={`${bedCount.reserved} reserved`} icon={BarChart3} tone="green" />
         <StatCard label="Available ICU" value={icuAvailable} hint="Critical care capacity" icon={BarChart3} tone="red" />
         <StatCard label="Doctors Available" value={docCounts.available} hint={`${docCounts.total} total`} icon={BarChart3} tone="violet" />
-        <StatCard label="Appointments" value={aptCounts.total} hint={`${aptCounts.checkedIn} checked in`} icon={BarChart3} tone="blue" />
+        <StatCard label="Appointments" value={aptCounts.total} hint={`${aptCounts.requested} requested • ${aptCounts.confirmed} confirmed`} icon={BarChart3} tone="blue" />
         <StatCard label="Completed" value={aptCounts.completed} hint={`${aptCounts.cancelled + aptCounts.noShow} missed/cancelled`} icon={BarChart3} tone="green" />
         <StatCard label="Active Emergencies" value={erSummary.active} hint={`${erSummary.critical} critical`} icon={BarChart3} tone="red" />
         <StatCard label="Services Available" value={svcCounts.available} hint={`${svcCounts.limited} limited`} icon={BarChart3} tone="teal" />
@@ -95,16 +95,14 @@ export default function HospitalAnalyticsPage() {
       <div className="grid gap-6 xl:grid-cols-12">
         <div className="xl:col-span-8">
           <SectionCard
-            title="Admissions / Discharges / Emergency / Appointments Trend"
-            description="30-day demo trend derived from the centralized dataset."
+            title="Emergency Reports & Appointment Requests"
+            description="Daily emergency reports and appointment requests recorded by your hospital over the selected period."
           >
             <TrendChart
               data={trendData}
               series={[
-                { key: "admissions", label: "Admissions" },
-                { key: "discharges", label: "Discharges" },
-                { key: "emergency", label: "Emergency" },
-                { key: "appointments", label: "Appointments" },
+                { key: "emergency", label: "Emergency reports" },
+                { key: "appointments", label: "Appointment requests" },
               ]}
             />
           </SectionCard>
@@ -148,7 +146,7 @@ export default function HospitalAnalyticsPage() {
             ))}
           </div>
         </SectionCard>
-        <SectionCard title="Doctor Availability Summary" description="Counts from demo roster">
+        <SectionCard title="Doctor Availability Summary" description="Counts from live roster">
           <div className="grid grid-cols-2 gap-2">
             <Card className="border-slate-200"><CardContent className="p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Available</p><p className="text-xl font-bold text-india-600">{docCounts.available}</p></CardContent></Card>
             <Card className="border-slate-200"><CardContent className="p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Limited</p><p className="text-xl font-bold text-saffron-700">{docCounts.limited}</p></CardContent></Card>
@@ -169,7 +167,7 @@ export default function HospitalAnalyticsPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Emergency Case Trends" description="Demo distribution by severity and current status">
+      <SectionCard title="Emergency Case Trends" description="live distribution by severity and current status">
         <div className="grid gap-3 md:grid-cols-4">
           <Card className="border-slate-200"><CardContent className="p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Critical</p><p className="text-xl font-bold text-red-700">{emergencyCases.filter((e) => e.severity === "CRITICAL").length}</p></CardContent></Card>
           <Card className="border-slate-200"><CardContent className="p-3"><p className="text-[11px] uppercase tracking-wide text-slate-500">Urgent</p><p className="text-xl font-bold text-saffron-700">{emergencyCases.filter((e) => e.severity === "URGENT").length}</p></CardContent></Card>

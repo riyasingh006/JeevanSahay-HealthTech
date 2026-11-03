@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { Plus, Search, Stethoscope, UserRoundCheck } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   HospitalStatusBadge,
   NativeSelect,
   PageHeader,
@@ -27,13 +27,13 @@ import { useToast } from "@/components/ui/toast";
 import {
   doctorAvailabilityCounts,
   type DoctorAvailability,
-} from "@/lib/hospital/demo-data";
+} from "@/lib/hospital/hospital-data";
 
 const AVAIL_OPTIONS: DoctorAvailability[] = ["AVAILABLE", "LIMITED", "UNAVAILABLE"];
 
 export default function HospitalDoctorsPage() {
-  const { doctors, departments, addDoctor, updateDoctor, toggleDoctorAvailability } =
-    useHospitalDemo();
+  const { doctors, departments, addDoctor, updateDoctor, toggleDoctorAvailability, loading } =
+    useHospitalPortal();
   const { toast } = useToast();
   const [query, setQuery] = React.useState("");
   const [deptFilter, setDeptFilter] = React.useState("all");
@@ -41,6 +41,7 @@ export default function HospitalDoctorsPage() {
   const [availFilter, setAvailFilter] = React.useState("all");
   const [open, setOpen] = React.useState(false);
   const [editId, setEditId] = React.useState<string | null>(null);
+  const [saving, setSaving] = React.useState(false);
   const [form, setForm] = React.useState({
     name: "",
     specialty: "",
@@ -113,39 +114,26 @@ export default function HospitalDoctorsPage() {
     setOpen(true);
   }
 
-  function submit() {
-    if (editId) {
-      updateDoctor(editId, {
-        name: form.name.trim(),
-        specialty: form.specialty.trim(),
-        department: form.department.trim(),
-        qualification: form.qualification.trim(),
-        experienceYears: Math.max(0, Number(form.experienceYears) || 0),
-        availability: form.availability,
-        shift: form.shift.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim(),
-      });
-      toast({ title: "Doctor updated", description: "Demo doctor profile updated.", variant: "success" });
-      setOpen(false);
-      return;
-    }
-    const result = addDoctor({
-      name: form.name,
-      specialty: form.specialty,
-      department: form.department,
-      qualification: form.qualification,
-      experienceYears: Number(form.experienceYears) || 0,
+  async function submit() {
+    const input = {
+      name: form.name.trim(),
+      specialty: form.specialty.trim(),
+      department: form.department.trim(),
+      qualification: form.qualification.trim(),
+      experienceYears: Math.max(0, Number(form.experienceYears) || 0),
       availability: form.availability,
-      shift: form.shift,
-      phone: form.phone,
-      email: form.email,
-    });
+      shift: form.shift.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+    };
+    setSaving(true);
+    const result = editId ? await updateDoctor(editId, input) : await addDoctor(input);
+    setSaving(false);
     if (!result.ok) {
-      toast({ title: "Could not add doctor", description: result.error ?? "Invalid input.", variant: "error" });
+      toast({ title: editId ? "Could not update doctor" : "Could not add doctor", description: result.error, variant: "error" });
       return;
     }
-    toast({ title: "Doctor added", description: "New demo doctor added to roster.", variant: "success" });
+    toast({ title: editId ? "Doctor updated" : "Doctor added", description: "The doctor record was saved.", variant: "success" });
     setOpen(false);
   }
 
@@ -164,13 +152,12 @@ export default function HospitalDoctorsPage() {
         }
       />
 
-      <DemoNotice>
-        Doctor records use clearly fictional demo data. Availability toggles update
-        local state only and never expose real credentials.
-      </DemoNotice>
+      <LiveRecordsNotice>
+        Doctor profiles are saved to this verified hospital. Availability is self-reported and appears in the public directory where applicable.
+      </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Doctors" value={counts.total} hint="In demo roster" icon={Stethoscope} tone="blue" />
+        <StatCard label="Total Doctors" value={counts.total} hint="In live roster" icon={Stethoscope} tone="blue" />
         <StatCard label="Available" value={counts.available} hint="Ready for duty" icon={UserRoundCheck} tone="green" />
         <StatCard label="Limited" value={counts.limited} hint="Partial availability" icon={Stethoscope} tone="amber" />
         <StatCard label="Unavailable" value={counts.unavailable} hint="Off-duty / leave" icon={Stethoscope} tone="red" />
@@ -248,6 +235,13 @@ export default function HospitalDoctorsPage() {
                   </TableCell>
                 </TableRow>
               ))}
+              {!loading && filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center text-sm text-slate-500">
+                    {doctors.length === 0 ? "No doctors have been added yet." : "No doctors match the current search or filters."}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
@@ -302,7 +296,7 @@ export default function HospitalDoctorsPage() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={submit}>{editId ? "Save Changes" : "Add Doctor"}</Button>
+            <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : editId ? "Save Changes" : "Add Doctor"}</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -138,6 +138,10 @@ model Hospital {
   savedBy     SavedHospital[]
   reviews     Review[]
   appointments Appointment[]
+  itemizedBeds HospitalBed[]
+  departments HospitalDepartment[]
+  emergencyCases EmergencyCase[]
+  settings HospitalSettings?
 }
 
 model BedInventory {
@@ -151,6 +155,22 @@ model BedInventory {
   @@unique([hospitalId, category])
 }
 
+model HospitalBed {
+  id         String   @id @default(cuid())
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  code       String
+  ward       String
+  category   String
+  department String?
+  status     String   @default("AVAILABLE") // AVAILABLE | OCCUPIED | RESERVED | MAINTENANCE
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@unique([hospitalId, code])
+  @@index([hospitalId, status, category])
+}
+
 model Doctor {
   id              String   @id @default(cuid())
   hospitalId      String
@@ -160,6 +180,8 @@ model Doctor {
   department      String?
   qualification   String?
   experienceYears Int      @default(0)
+  phone           String?
+  email           String?
   availability    String   @default("AVAILABLE") // AVAILABLE | LIMITED | UNAVAILABLE
   timings         String?
   languages       String?
@@ -168,11 +190,30 @@ model Doctor {
   appointments    Appointment[]
 }
 
+model HospitalDepartment {
+  id          String   @id @default(cuid())
+  hospitalId  String
+  hospital    Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  name        String
+  head        String
+  status      String   @default("ACTIVE") // ACTIVE | LIMITED | INACTIVE
+  location    String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([hospitalId, name])
+  @@index([hospitalId, status])
+}
+
 model Service {
   id         String   @id @default(cuid())
   hospitalId String
   hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
   key        String // EMERGENCY, ICU, AMBULANCE, BLOOD_BANK, PHARMACY, DIAGNOSTICS, MRI, CT_SCAN, DIALYSIS, OPERATION_THEATRE ...
+  name       String?
+  department String?
+  hours      String?
   status     String   @default("AVAILABLE") // AVAILABLE | LIMITED | UNAVAILABLE
   details    String?
   updatedAt  DateTime @updatedAt
@@ -210,6 +251,35 @@ model Notification {
   link      String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model EmergencyCase {
+  id          String   @id @default(cuid())
+  hospitalId  String
+  hospital    Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  reference   String
+  patientRef  String
+  age         Int?
+  condition   String
+  severity    String   @default("MODERATE") // CRITICAL | URGENT | MODERATE
+  status      String   @default("RECEIVED") // RECEIVED | IN_TREATMENT | STABILIZED | DISCHARGED
+  department  String?
+  location    String?
+  reportedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([hospitalId, reference])
+  @@index([hospitalId, status, reportedAt])
+  @@index([hospitalId, severity, reportedAt])
+}
+
+model HospitalSettings {
+  id         String   @id @default(cuid())
+  hospitalId String   @unique
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  configJson String   @default("{}")
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
 }
 
 model DailyStat {

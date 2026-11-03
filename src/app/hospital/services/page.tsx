@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { HeartPulse, Plus, Search } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   HospitalStatusBadge,
   NativeSelect,
   PageHeader,
@@ -25,18 +25,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
-import { serviceStatusCounts, type ServiceStatus } from "@/lib/hospital/demo-data";
+import { serviceStatusCounts, type ServiceStatus } from "@/lib/hospital/hospital-data";
 
 const STATUS_OPTS: ServiceStatus[] = ["AVAILABLE", "LIMITED", "UNAVAILABLE"];
 
 export default function HospitalServicesPage() {
-  const { services, departments, addService, updateService, removeService } = useHospitalDemo();
+  const { services, departments, addService, updateService, removeService, loading } = useHospitalPortal();
   const { toast } = useToast();
   const [query, setQuery] = React.useState("");
   const [deptFilter, setDeptFilter] = React.useState("all");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [open, setOpen] = React.useState(false);
   const [editId, setEditId] = React.useState<string | null>(null);
+  const [saving, setSaving] = React.useState(false);  const [removingId, setRemovingId] = React.useState<string | null>(null);
+
   const [form, setForm] = React.useState({
     name: "",
     department: departments[0]?.name ?? "",
@@ -72,20 +74,28 @@ export default function HospitalServicesPage() {
     setOpen(true);
   }
 
-  function submit() {
-    if (editId) {
-      updateService(editId, form);
-      toast({ title: "Service updated", description: "Demo service updated.", variant: "success" });
-      setOpen(false);
-      return;
-    }
-    const result = addService(form);
+  async function submit() {
+    setSaving(true);
+    const result = editId ? await updateService(editId, form) : await addService(form);
+    setSaving(false);
     if (!result.ok) {
-      toast({ title: "Could not add service", description: result.error ?? "Invalid input.", variant: "error" });
+      toast({ title: editId ? "Could not update service" : "Could not add service", description: result.error, variant: "error" });
       return;
     }
-    toast({ title: "Service added", description: "New demo service added.", variant: "success" });
+    toast({ title: editId ? "Service updated" : "Service added", description: "The service record was saved.", variant: "success" });
     setOpen(false);
+  }
+
+  async function deleteService(id: string, name: string) {
+    if (!window.confirm(`Remove ${name} from this hospital's service list?`)) return;
+    setRemovingId(id);
+    const result = await removeService(id);
+    setRemovingId(null);
+    if (!result.ok) {
+      toast({ title: "Could not remove service", description: result.error, variant: "error" });
+      return;
+    }
+    toast({ title: "Service removed", description: "The service record was removed.", variant: "success" });
   }
 
   return (
@@ -103,10 +113,9 @@ export default function HospitalServicesPage() {
         }
       />
 
-      <DemoNotice>
-        Examples include Emergency Care, Cardiology, Orthopedics, Radiology, and
-        Laboratory Services. Availability is demo-only.
-      </DemoNotice>
+      <LiveRecordsNotice>
+        Service records are stored for this verified hospital. Public availability reflects the status saved here and may not match an external scheduling system.
+      </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Services" value={counts.total} hint="In directory" icon={HeartPulse} tone="blue" />
@@ -158,11 +167,18 @@ export default function HospitalServicesPage() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="sm" onClick={() => openEdit(svc.id)}>Edit</Button>
-                      <Button variant="ghost" size="sm" className="text-red-700" onClick={() => { removeService(svc.id); toast({ title: "Service removed", description: "Demo service removed.", variant: "warning" }); }}>Remove</Button>
+                      <Button variant="ghost" size="sm" className="text-red-700" disabled={removingId === svc.id} onClick={() => void deleteService(svc.id, svc.name)}>{removingId === svc.id ? "Removing…" : "Remove"}</Button>
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
+              {!loading && filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-sm text-slate-500">
+                    {services.length === 0 ? "No services have been added yet." : "No services match the current search or filters."}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
@@ -201,7 +217,7 @@ export default function HospitalServicesPage() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={submit}>{editId ? "Save Changes" : "Add Service"}</Button>
+            <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : editId ? "Save Changes" : "Add Service"}</Button>
           </div>
         </DialogContent>
       </Dialog>

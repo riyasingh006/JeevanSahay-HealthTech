@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { Building2, Plus, Search } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   HospitalStatusBadge,
   NativeSelect,
   PageHeader,
@@ -25,17 +25,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
-import { departmentDoctorCount } from "@/lib/hospital/demo-data";
+import { departmentDoctorCount } from "@/lib/hospital/hospital-data";
 
 const DEPT_STATUS = ["ACTIVE", "LIMITED", "INACTIVE"] as const;
 
 export default function HospitalDepartmentsPage() {
-  const { departments, doctors, beds, addDepartment, updateDepartment } = useHospitalDemo();
+  const { departments, doctors, beds, addDepartment, updateDepartment, loading } = useHospitalPortal();
   const { toast } = useToast();
   const [query, setQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [open, setOpen] = React.useState(false);
   const [editId, setEditId] = React.useState<string | null>(null);
+  const [saving, setSaving] = React.useState(false);
   const [form, setForm] = React.useState({
     name: "",
     head: "",
@@ -77,25 +78,22 @@ export default function HospitalDepartmentsPage() {
     setOpen(true);
   }
 
-  function submit() {
-    if (editId) {
-      updateDepartment(editId, {
-        name: form.name.trim(),
-        head: form.head.trim(),
-        status: form.status,
-        location: form.location.trim(),
-        description: form.description.trim(),
-      });
-      toast({ title: "Department updated", description: "Demo department updated.", variant: "success" });
-      setOpen(false);
-      return;
-    }
-    const result = addDepartment(form);
+  async function submit() {
+    const input = {
+      name: form.name.trim(),
+      head: form.head.trim(),
+      status: form.status,
+      location: form.location.trim(),
+      description: form.description.trim(),
+    };
+    setSaving(true);
+    const result = editId ? await updateDepartment(editId, input) : await addDepartment(input);
+    setSaving(false);
     if (!result.ok) {
-      toast({ title: "Could not add department", description: result.error ?? "Invalid input.", variant: "error" });
+      toast({ title: editId ? "Could not update department" : "Could not add department", description: result.error, variant: "error" });
       return;
     }
-    toast({ title: "Department added", description: "New demo department created.", variant: "success" });
+    toast({ title: editId ? "Department updated" : "Department added", description: "The department record was saved.", variant: "success" });
     setOpen(false);
   }
 
@@ -107,7 +105,7 @@ export default function HospitalDepartmentsPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Department Management"
-        description="Manage departments, department heads, bed capacity, and department details with demo data."
+        description="Manage departments, department heads, bed capacity, and department details with live data."
         icon={Building2}
         actions={
           <Button size="sm" className="gap-1.5" onClick={openCreate}>
@@ -117,10 +115,10 @@ export default function HospitalDepartmentsPage() {
         }
       />
 
-      <DemoNotice>
-        Department actions are local to the demo store and keep summary cards
+      <LiveRecordsNotice>
+        Department actions are local to the live store and keep summary cards
         consistent across the portal.
-      </DemoNotice>
+      </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Departments" value={departments.length} hint="Configured" icon={Building2} tone="blue" />
@@ -157,7 +155,7 @@ export default function HospitalDepartmentsPage() {
                 <TableHead>Department</TableHead>
                 <TableHead>Department Head</TableHead>
                 <TableHead>Doctors</TableHead>
-                <TableHead>Bed Capacity (demo)</TableHead>
+                <TableHead>Bed Capacity (live)</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -180,6 +178,13 @@ export default function HospitalDepartmentsPage() {
                   </TableCell>
                 </TableRow>
               ))}
+              {!loading && filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center text-sm text-slate-500">
+                    {departments.length === 0 ? "No departments have been added yet." : "No departments match the current search or filters."}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
@@ -216,7 +221,7 @@ export default function HospitalDepartmentsPage() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={submit}>{editId ? "Save Changes" : "Add Department"}</Button>
+            <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : editId ? "Save Changes" : "Add Department"}</Button>
           </div>
         </DialogContent>
       </Dialog>

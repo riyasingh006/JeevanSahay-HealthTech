@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, requireRole, writeAudit } from "@/lib/auth";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
+import { notifyHospitalAdmins } from "@/lib/hospital/portal-api";
 
 const requestSchema = z.object({
   hospitalId: z.string().min(1).max(64),
@@ -96,6 +97,16 @@ export const POST = withApi(
       meta: { hospitalId: hospital.id, doctorId: data.doctorId ?? null },
       ip: await getClientIp(),
     });
+    try {
+      await notifyHospitalAdmins(hospital.id, {
+        title: "New appointment request",
+        body: "A patient submitted an appointment request.",
+        type: "INFO",
+        link: "/hospital/appointments",
+      });
+    } catch (error) {
+      console.error("[appointments] hospital notification fan-out failed", error);
+    }
     return ok({ appointment }, { status: 201 });
   },
   { limit: 10, windowMs: 60_000, keyPrefix: "appointment-create" }

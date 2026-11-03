@@ -13,9 +13,9 @@ import {
   Siren,
   Stethoscope,
 } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   HospitalStatusBadge,
   LegendDot,
   OccupancyDonut,
@@ -23,25 +23,25 @@ import {
   ProgressBar,
   SectionCard,
   StatCard,
-  todayDemoLabel,
+  todayHospitalLabel,
 } from "@/components/hospital/hospital-ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  availableIcuBeds,
-  bedCounts,
-  bedsByType,
+  availableBedsByType,
+  bedInventoryCounts,
+  bedInventoryByType,
   departmentBedSummary,
   departmentDoctorCount,
   doctorAvailabilityCounts,
   emergencySummary,
-  formatDemoTime,
+  formatHospitalTime,
   serviceStatusCounts,
   todayAppointments,
-} from "@/lib/hospital/demo-data";
+} from "@/lib/hospital/hospital-data";
 import { cn } from "@/lib/utils";
 
-function timeAgoDemo(value: string): string {
+function timeAgo(value: string): string {
   const then = new Date(value).getTime();
   const diff = Date.now() - then;
   const mins = Math.floor(diff / 60000);
@@ -54,6 +54,7 @@ function timeAgoDemo(value: string): string {
 export default function HospitalDashboardPage() {
   const {
     beds,
+    bedInventory,
     doctors,
     departments,
     emergencyCases,
@@ -61,16 +62,16 @@ export default function HospitalDashboardPage() {
     appointments,
     profile,
     activity,
-  } = useHospitalDemo();
+  } = useHospitalPortal();
 
-  const counts = bedCounts(beds);
-  const byType = bedsByType(beds);
+  const counts = bedInventoryCounts(bedInventory, beds);
+  const byType = bedInventoryByType(bedInventory, beds);
   const docCounts = doctorAvailabilityCounts(doctors);
   const deptSummary = departmentBedSummary(beds, departments);
   const svcCounts = serviceStatusCounts(services);
   const erSummary = emergencySummary(emergencyCases);
   const todaysAppointments = todayAppointments(appointments);
-  const icuAvailable = availableIcuBeds(beds);
+  const icuAvailable = availableBedsByType(bedInventory, beds, "ICU");
   const occupancy = counts.total ? Math.round((counts.occupied / counts.total) * 100) : 0;
 
   const quickActions = [
@@ -101,7 +102,7 @@ export default function HospitalDashboardPage() {
       <PageHeader
         eyebrow="Hospital Portal"
         title="Hospital Overview"
-        description={`${profile.name} • ${profile.city}, ${profile.state} • ${todayDemoLabel()}`}
+        description={`${profile.name} • ${profile.city}, ${profile.state} • ${todayHospitalLabel()}`}
         icon={LayoutDashboard}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -121,10 +122,9 @@ export default function HospitalDashboardPage() {
         }
       />
 
-      <DemoNotice>
-        All values below are derived from the centralized demo dataset and update
-        together when you add, edit, or change statuses in the portal.
-      </DemoNotice>
+      <LiveRecordsNotice>
+        Figures come from records saved by this verified hospital. Bed availability and service status are self-reported here, not synchronized from an external hospital information system.
+      </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -172,7 +172,7 @@ export default function HospitalDashboardPage() {
         <StatCard
           label="Today's Appointments"
           value={todaysAppointments.length}
-          hint={`${appointments.filter((a) => a.status === "CHECKED_IN").length} checked in`}
+          hint={`${appointments.filter((a) => a.status === "CONFIRMED").length} confirmed`}
           icon={CalendarClock}
           tone="blue"
         />
@@ -277,7 +277,7 @@ export default function HospitalDashboardPage() {
 
           <SectionCard
             title="Today's Appointment Schedule"
-            description="Demo appointments for the current day with live status tracking."
+            description="Patient-submitted appointment requests scheduled for today."
             actions={
               <Button variant="ghost" size="sm" className="gap-1.5" asChild>
                 <Link href="/hospital/appointments">
@@ -290,7 +290,7 @@ export default function HospitalDashboardPage() {
             <div className="space-y-2">
               {todaysAppointments.length === 0 && (
                 <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-300 py-8 text-sm text-slate-500">
-                  No appointments scheduled for today in demo data.
+                  No patient appointments are scheduled for today.
                 </div>
               )}
               {todaysAppointments.map((apt) => (
@@ -321,7 +321,7 @@ export default function HospitalDashboardPage() {
         <div className="space-y-6 xl:col-span-5">
           <SectionCard
             title="Emergency Status Summary"
-            description="Fictional demo emergency queue with severity and department mapping."
+            description="Cases recorded by this hospital, with severity and department."
             actions={
               <Button variant="ghost" size="sm" className="gap-1.5" asChild>
                 <Link href="/hospital/emergency">
@@ -371,7 +371,7 @@ export default function HospitalDashboardPage() {
                     <span>
                       {e.reference} • {e.location} • {e.department}
                     </span>
-                    <span>{formatDemoTime(e.reportedAt)}</span>
+                    <span>{formatHospitalTime(e.reportedAt)}</span>
                   </div>
                 </div>
               ))}
@@ -380,7 +380,7 @@ export default function HospitalDashboardPage() {
 
           <SectionCard
             title="Doctor Availability Overview"
-            description="Current demo availability across clinical teams."
+            description="Availability recorded for this hospital's clinical teams."
             actions={
               <Button variant="ghost" size="sm" className="gap-1.5" asChild>
                 <Link href="/hospital/doctors">
@@ -410,7 +410,7 @@ export default function HospitalDashboardPage() {
 
           <SectionCard
             title="Healthcare Services"
-            description="Service readiness snapshot from the demo directory."
+            description="Services and availability recorded for this hospital."
             actions={
               <Button variant="ghost" size="sm" className="gap-1.5" asChild>
                 <Link href="/hospital/services">
@@ -454,7 +454,7 @@ export default function HospitalDashboardPage() {
 
           <SectionCard
             title="Recent Hospital Activity"
-            description="Demo audit trail for the current session context."
+            description="Recent changes made to this hospital's saved records."
           >
             <div className="space-y-2">
               {activity.slice(0, 5).map((item) => (
@@ -464,7 +464,7 @@ export default function HospitalDashboardPage() {
                       "mt-1.5 h-1.5 w-1.5 rounded-full",
                       item.tone === "red" && "bg-red-500",
                       item.tone === "amber" && "bg-saffron-500",
-                      item.tone === "teal" && "bg-care-500",
+                      item.tone === "green" && "bg-emerald-500",
                       item.tone === "blue" && "bg-primary-600"
                     )}
                     aria-hidden
@@ -472,7 +472,7 @@ export default function HospitalDashboardPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm leading-relaxed text-primary-950">{item.message}</p>
                     <p className="text-xs text-slate-500">
-                      {item.detail} • {timeAgoDemo(item.at)}
+                      {item.detail} • {timeAgo(item.at)}
                     </p>
                   </div>
                 </div>
@@ -484,7 +484,7 @@ export default function HospitalDashboardPage() {
             <CardContent className="p-4">
               <p className="text-sm font-semibold text-primary-950">Quick Actions</p>
               <p className="mt-0.5 text-xs text-slate-500">
-                Common demo workflows for hospital operations.
+                Shortcuts to hospital record management.
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {quickActions.map((action) => {

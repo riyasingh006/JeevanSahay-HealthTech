@@ -24,8 +24,8 @@ import Image from "next/image";
 import logoAsset from "@/components/landing/logo/3af76e7bd07c86d6e6e08b17eef080c0.jpg";
 import { useAuth } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
-import { HospitalDemoProvider, useHospitalDemo } from "@/components/hospital/hospital-store";
-import { DemoDataBadge } from "@/components/hospital/hospital-ui";
+import { HospitalPortalProvider, useHospitalPortal } from "@/components/hospital/hospital-store";
+import { HospitalDataBadge } from "@/components/hospital/hospital-ui";
 
 function HospitalBrand({ plain = false }: { plain?: boolean }) {
   return (
@@ -145,7 +145,7 @@ export default function HospitalLayout({ children }: { children: React.ReactNode
   }
 
   function HospitalShell() {
-    const { notifications } = useHospitalDemo();
+    const { notifications, loading: dataLoading, error, refresh } = useHospitalPortal();
     const unread = notifications.filter((item) => !item.read).length;
 
     return (
@@ -215,7 +215,7 @@ export default function HospitalLayout({ children }: { children: React.ReactNode
                 </span>
                 <div className="hidden items-center gap-2 lg:flex">
                   <span className="truncate text-sm font-semibold text-primary-950">Hospital Management Portal</span>
-                  <DemoDataBadge />
+                  <HospitalDataBadge />
                 </div>
               </div>
 
@@ -247,6 +247,14 @@ export default function HospitalLayout({ children }: { children: React.ReactNode
           </header>
 
           <main id="main-content" className="mx-auto max-w-7xl px-4 py-6 pb-16 sm:px-6 md:py-8 lg:px-8">
+            {error ? (
+              <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <span>Hospital records could not be loaded: {error}</span>
+                <Button variant="secondary" size="sm" onClick={() => void refresh()}>Retry</Button>
+              </div>
+            ) : dataLoading ? (
+              <p role="status" className="mb-5 text-sm text-slate-500">Loading hospital records…</p>
+            ) : null}
             {children}
           </main>
         </div>
@@ -255,8 +263,8 @@ export default function HospitalLayout({ children }: { children: React.ReactNode
   }
 
   return (
-    <HospitalDemoProvider>
+    <HospitalPortalProvider>
       <HospitalShell />
-    </HospitalDemoProvider>
+    </HospitalPortalProvider>
   );
 }
