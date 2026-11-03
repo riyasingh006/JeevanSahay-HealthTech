@@ -46,6 +46,9 @@ model User {
   auditLogs      AuditLog[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([hospitalId, role, status])
+  @@index([role, status, createdAt])
 }
 
 model UserSession {
@@ -142,6 +145,8 @@ model Hospital {
   departments HospitalDepartment[]
   emergencyCases EmergencyCase[]
   settings HospitalSettings?
+
+  @@index([status, createdAt])
 }
 
 model BedInventory {
@@ -188,6 +193,9 @@ model Doctor {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   appointments    Appointment[]
+
+  @@index([hospitalId, name])
+  @@index([hospitalId, specialty, availability])
 }
 
 model HospitalDepartment {
@@ -230,6 +238,7 @@ model SavedHospital {
   createdAt  DateTime @default(now())
 
   @@unique([userId, hospitalId])
+  @@index([hospitalId])
 }
 
 model SearchRecord {
@@ -239,6 +248,9 @@ model SearchRecord {
   query     String
   mode      String   @default("SEARCH") // SEARCH | EMERGENCY | AI
   createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([mode, createdAt])
 }
 
 model Notification {
@@ -251,6 +263,9 @@ model Notification {
   link      String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, read])
 }
 
 model EmergencyCase {
@@ -304,6 +319,8 @@ model ChatSession {
   messages  ChatMessage[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+
+  @@index([userId, updatedAt])
 }
 
 model ChatMessage {
@@ -314,6 +331,8 @@ model ChatMessage {
   content   String
   meta      String? // JSON payload (recommendations etc.)
   createdAt DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
 }
 
 model AuditLog {
@@ -327,6 +346,10 @@ model AuditLog {
   meta        String?
   ip          String?
   createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId, createdAt])
 }
 
 model Report {
@@ -341,6 +364,8 @@ model Report {
   resolutionNote String?
   createdAt      DateTime  @default(now())
   resolvedAt     DateTime?
+
+  @@index([status, createdAt])
 }
 
 model Review {
@@ -355,6 +380,7 @@ model Review {
   createdAt  DateTime @default(now())
 
   @@unique([userId, hospitalId])
+  @@index([hospitalId, status, createdAt])
 }
 
 model Appointment {
@@ -377,5 +403,6 @@ model Appointment {
 
   @@index([patientId, createdAt])
   @@index([hospitalId, status, scheduledAt])
+  @@index([hospitalId, status, createdAt])
   @@index([doctorId, scheduledAt])
 }

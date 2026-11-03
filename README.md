@@ -10,7 +10,7 @@ A Next.js healthcare-directory application with patient, hospital and super-admi
 - Hospital updates to itemised beds update the patient-facing availability aggregates transactionally. Hospital accounts cannot read or modify another hospital's records.
 - Admin portal: protected overview and analytics, hospital application verification/rejection, searchable account suspension/reactivation, report triage, CSV exports and read-only audit review. Admin actions are role-checked, audited and session-revoking where appropriate.
 - Hospital applicants remain pending until a super-admin approves them; approval/rejection is transactional, creates an in-app notification and sends an email when SMTP is configured. Approvals require verified email and confirmed map coordinates.
-- Versioned production migrations remain a later implementation phase; do not treat `db:push` as a production migration strategy.
+- Versioned SQLite migrations now define the complete baseline and additive query indexes. The Render/PostgreSQL provider configuration is handled separately in Phase 10; never use `db:push` as a production migration strategy.
 
 ## Local setup
 
@@ -23,14 +23,32 @@ cp .env.example .env
 
 Set a long random `SESSION_SECRET` in `.env` (for example, generate one with `openssl rand -hex 32`). Email verification, password recovery and passwordless login require a working SMTP provider. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` and `SMTP_SECURE`; set `NEXT_PUBLIC_APP_URL` to the origin served by the app. Google sign-in is optional and requires the Google OAuth client ID, secret and matching callback URL in `GOOGLE_REDIRECT_URI`.
 
-For a **new local database only**, apply the current Prisma schema and start the app:
+For a **new local database**, apply the checked-in migrations and start the app:
 
 ```sh
-npm run db:push
+npm run db:migrate:deploy
 npm run dev
 ```
 
-Open `http://localhost:3000`. Existing users and hospitals are not created automatically. The `db:push` command is intended for a fresh local database until the versioned production-migration phase is complete. Back up any existing database before changing its schema.
+Open `http://localhost:3000`. Existing users and hospitals are not created automatically. Use `npm run db:migrate:status` to inspect migration state. Create future development migrations with `npm run db:migrate:dev -- --name concise_change_name` against a disposable/local database, then review the generated SQL before committing it. `npm run db:push` is reserved for the disposable integration-test harness and fresh throwaway databases.
+
+### Existing SQLite databases previously initialized with `db:push`
+
+Do not run `migrate deploy` blindly against an existing database with no migration history. First stop application writes and make a verified backup. Compare the database with the exact Phase 4 schema (before the additive indexes) and baseline only if there is no difference:
+
+```sh
+git show 491d57d:prisma/schema.prisma > /tmp/jeevan-phase4-schema.prisma
+DATABASE_URL="$DATABASE_URL" npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel /tmp/jeevan-phase4-schema.prisma --exit-code
+```
+
+Proceed only if Prisma reports `No difference detected`. Then mark the schema baseline as already present and apply the new index migration:
+
+```sh
+DATABASE_URL="$DATABASE_URL" npx prisma migrate resolve --applied 20261103103500_sqlite_baseline
+npm run db:migrate:deploy
+```
+
+If the comparison reports any difference, stop; do not mark the baseline or reset the database. Prepare a separate reviewed backfill/migration for that database. The checked-in migrations target SQLite; the production database/provider and deployment-specific migration path must be established before Render rollout.
 
 ## Optional local fixtures and admin bootstrap
 
