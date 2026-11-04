@@ -397,6 +397,9 @@ async function main() {
   assert.equal(updatedPatient.age, 41);
   const profileBeforeShare = await request("/api/user/profile", "GET", undefined, patientSessionCookie);
   assert.equal(profileBeforeShare.json.data.profile.hasSharePin, false);
+  assert.equal("sharePin" in profileBeforeShare.json.data.profile, false);
+  const shareWithoutPin = await request("/api/user/health-share", "POST", undefined, patientSessionCookie);
+  assert.equal(shareWithoutPin.response.status, 409);
   const pinUpdate = await request("/api/user/profile", "PUT", {
     currentPassword: "Replacement!Password456",
     newPin: "482913",
@@ -404,12 +407,37 @@ async function main() {
   assert.equal(pinUpdate.response.status, 200);
   const shareTokenResponse = await request("/api/user/health-share", "POST", undefined, patientSessionCookie);
   assert.equal(shareTokenResponse.response.status, 200);
-  const shareQuery = new URLSearchParams({ token: shareTokenResponse.json.data.token, pin: "482913" });
-  const sharedProfile = await request(`/api/user/health-share?${shareQuery.toString()}`);
+  const shareToken = shareTokenResponse.json.data.token;
+  const shareUrl = new URL(shareTokenResponse.json.data.url, "http://localhost");
+  assert.equal(shareUrl.pathname, "/share");
+  assert.equal(shareUrl.search, "");
+  assert.equal(shareUrl.hash.slice(1), shareToken);
+  assert.equal(shareUrl.searchParams.has("pin"), false);
+  const sharePageResponse = await fetch(`${baseUrl}/share#${shareToken}`, { headers: { Accept: "text/html" } });
+  assert.equal(sharePageResponse.status, 200);
+  assert.match(await sharePageResponse.text(), /Digital Health Profile/);
+  assert.equal((await request("/api/user/health-share", "GET")).response.status, 405);
+  assert.equal((await request(`/api/user/health-share?token=${encodeURIComponent(shareToken)}&pin=482913`, "GET")).response.status, 405);
+  assert.equal((await request("/api/user/health-share/resolve", "GET")).response.status, 405);
+  assert.equal((await request(`/api/user/health-share/resolve?token=${encodeURIComponent(shareToken)}&pin=482913`, "GET")).response.status, 405);
+  const pinInPostQuery = await request(`/api/user/health-share/resolve?token=${encodeURIComponent(shareToken)}&pin=482913`, "POST", {});
+  assert.equal(pinInPostQuery.response.status, 422);
+  const wrongSharePin = await request("/api/user/health-share/resolve", "POST", { token: shareToken, pin: "111111" });
+  assert.equal(wrongSharePin.response.status, 403);
+  assert.match(wrongSharePin.response.headers.get("cache-control") ?? "", /no-store/);
+  const sharedProfile = await request("/api/user/health-share/resolve", "POST", { token: shareToken, pin: "482913" });
   assert.equal(sharedProfile.response.status, 200);
+  assert.match(sharedProfile.response.headers.get("cache-control") ?? "", /no-store/);
   assert.equal(sharedProfile.json.data.summary.conditions, "Controlled hypertension");
   assert.equal("email" in sharedProfile.json.data.summary, false);
-  console.log("PASS patient profile updates stay scoped and health sharing requires a PIN");
+  assert.equal("sharePin" in sharedProfile.json.data.summary, false);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const response = await request("/api/user/health-share/resolve", "POST", { token: shareToken, pin: "111111" });
+    assert.equal(response.response.status, 403);
+  }
+  const rateLimitedShare = await request("/api/user/health-share/resolve", "POST", { token: shareToken, pin: "482913" });
+  assert.equal(rateLimitedShare.response.status, 429);
+  console.log("PASS patient profile updates stay scoped; PINs stay out of URLs; health sharing checks PIN and disables caching");
   const appointmentHospital = await prisma.hospital.create({
     data: {
       name: "Appointments Test Hospital",
@@ -1032,6 +1060,93 @@ async function main() {
   const publicHospital = await request(`/api/hospitals/${encodeURIComponent(appointmentHospital.id)}`);
   assert.equal(publicHospital.response.status, 200);
   assert.equal(publicHospital.json.data.hospital.beds.find((item: { category: string }) => item.category === "ICU").available, 1);
+
+  const concurrentBedCreates = await Promise.all([
+    request("/api/hospital/beds", "POST", { id: "A-GEN-01", ward: "General Ward", bedType: "GENERAL", department: "", status: "AVAILABLE" }, hospitalCookie),
+    request("/api/hospital/beds", "POST", { id: "A-GEN-02", ward: "General Ward", bedType: "GENERAL", department: "", status: "AVAILABLE" }, hospitalCookie),
+  ]);
+  assert.ok(concurrentBedCreates.every((result) => result.response.status === 201), JSON.stringify(concurrentBedCreates.map((result) => result.json)));
+  const concurrentGeneralInventory = await prisma.bedInventory.findUniqueOrThrow({
+    where: { hospitalId_category: { hospitalId: appointmentHospital.id, category: "GENERAL" } },
+  });
+  assert.equal(concurrentGeneralInventory.total, 2);
+  assert.equal(concurrentGeneralInventory.available, 2);
+
+  const concurrentBedUpdates = await Promise.all([
+    request("/api/hospital/beds/A-ICU-01", "PATCH", { status: "OCCUPIED" }, hospitalCookie),
+    request("/api/hospital/beds/A-ICU-01", "PATCH", { status: "RESERVED" }, hospitalCookie),
+  ]);
+  assert.ok(concurrentBedUpdates.every((result) => [200, 409].includes(result.response.status)), JSON.stringify(concurrentBedUpdates.map((result) => result.json)));
+  assert.ok(concurrentBedUpdates.some((result) => result.response.status === 200));
+  const concurrentIcuBed = await prisma.hospitalBed.findFirstOrThrow({ where: { hospitalId: appointmentHospital.id, code: "A-ICU-01" } });
+  const concurrentIcuInventory = await prisma.bedInventory.findUniqueOrThrow({
+    where: { hospitalId_category: { hospitalId: appointmentHospital.id, category: "ICU" } },
+  });
+  assert.equal(concurrentIcuInventory.total, 1);
+  assert.equal(concurrentIcuInventory.available, concurrentIcuBed.status === "AVAILABLE" ? 1 : 0);
+
+  const restoredIcuBed = await request("/api/hospital/beds/A-ICU-01", "PATCH", { status: "AVAILABLE" }, hospitalCookie);
+  assert.equal(restoredIcuBed.response.status, 200);
+  const deleteVsOccupy = await Promise.all([
+    request("/api/hospital/beds/A-ICU-01", "DELETE", undefined, hospitalCookie),
+    request("/api/hospital/beds/A-ICU-01", "PATCH", { status: "OCCUPIED" }, hospitalCookie),
+  ]);
+  assert.ok([200, 409].includes(deleteVsOccupy[0].response.status), JSON.stringify(deleteVsOccupy.map((result) => result.json)));
+  assert.ok([200, 404, 409].includes(deleteVsOccupy[1].response.status), JSON.stringify(deleteVsOccupy.map((result) => result.json)));
+  assert.ok(!(deleteVsOccupy[0].response.status === 200 && deleteVsOccupy[1].response.status === 200));
+  let survivingIcuBed = await prisma.hospitalBed.findFirst({ where: { hospitalId: appointmentHospital.id, code: "A-ICU-01" } });
+  let finalIcuInventory = await prisma.bedInventory.findUniqueOrThrow({
+    where: { hospitalId_category: { hospitalId: appointmentHospital.id, category: "ICU" } },
+  });
+  assert.equal(finalIcuInventory.total, survivingIcuBed ? 1 : 0);
+  assert.equal(finalIcuInventory.available, survivingIcuBed?.status === "AVAILABLE" ? 1 : 0);
+  if (survivingIcuBed) {
+    if (survivingIcuBed.status === "OCCUPIED") {
+      const makeAvailable = await request("/api/hospital/beds/A-ICU-01", "PATCH", { status: "AVAILABLE" }, hospitalCookie);
+      assert.equal(makeAvailable.response.status, 200);
+    }
+    const removeRemainingBed = await request("/api/hospital/beds/A-ICU-01", "DELETE", undefined, hospitalCookie);
+    assert.equal(removeRemainingBed.response.status, 200, JSON.stringify(removeRemainingBed.json));
+  }
+  finalIcuInventory = await prisma.bedInventory.findUniqueOrThrow({
+    where: { hospitalId_category: { hospitalId: appointmentHospital.id, category: "ICU" } },
+  });
+  assert.equal(finalIcuInventory.total, 0);
+  assert.equal(finalIcuInventory.available, 0);
+  assert.equal((await request("/api/hospital/beds/A-ICU-01", "DELETE", undefined, hospitalCookie)).response.status, 404);
+  const deleteRaceBed = await request("/api/hospital/beds", "POST", { id: "A-DELETE-01", ward: "General Ward", bedType: "ICU", department: "", status: "AVAILABLE" }, hospitalCookie);
+  assert.equal(deleteRaceBed.response.status, 201);
+  const deleteRace = await Promise.all([
+    request("/api/hospital/beds/A-DELETE-01", "DELETE", undefined, hospitalCookie),
+    request("/api/hospital/beds/A-DELETE-01", "PATCH", { status: "OCCUPIED" }, hospitalCookie),
+  ]);
+  assert.ok(deleteRace.every((result) => [200, 404, 409].includes(result.response.status)), JSON.stringify(deleteRace.map((result) => result.json)));
+  const icuBedsAfterRace = await prisma.hospitalBed.findMany({ where: { hospitalId: appointmentHospital.id, category: "ICU" } });
+  const icuInventoryAfterRace = await prisma.bedInventory.findUniqueOrThrow({ where: { hospitalId_category: { hospitalId: appointmentHospital.id, category: "ICU" } } });
+  assert.equal(icuInventoryAfterRace.total, icuBedsAfterRace.length);
+  assert.equal(icuInventoryAfterRace.available, icuBedsAfterRace.filter((bed) => bed.status === "AVAILABLE").length);
+
+  const legacyGuardBed = await request("/api/hospital/beds", "POST", { id: "A-LEGACY-ICU-01", ward: "Critical Care", bedType: "ICU", department: "", status: "AVAILABLE" }, hospitalCookie);
+  assert.equal(legacyGuardBed.response.status, 201);
+  const legacyItemizedUpdate = await request(`/api/hospitals/${encodeURIComponent(appointmentHospital.id)}/beds`, "PATCH", {
+    beds: [{ category: "ICU", total: 1, available: 1 }],
+  }, hospitalCookie);
+  assert.equal(legacyItemizedUpdate.response.status, 409);
+  assert.equal((await request("/api/hospital/beds/A-LEGACY-ICU-01", "DELETE", undefined, hospitalCookie)).response.status, 200);
+  const aggregateUpdate = await request(`/api/hospitals/${encodeURIComponent(appointmentHospital.id)}/beds`, "PATCH", {
+    beds: [{ category: "VENTILATOR", total: 4, available: 2 }],
+  }, hospitalCookie);
+  assert.equal(aggregateUpdate.response.status, 200, JSON.stringify(aggregateUpdate.json));
+  const aggregateRaces = await Promise.all([
+    request(`/api/hospitals/${encodeURIComponent(appointmentHospital.id)}/beds`, "PATCH", { beds: [{ category: "VENTILATOR", total: 7, available: 4 }] }, hospitalCookie),
+    request(`/api/hospitals/${encodeURIComponent(appointmentHospital.id)}/beds`, "PATCH", { beds: [{ category: "VENTILATOR", total: 5, available: 2 }] }, hospitalCookie),
+  ]);
+  assert.ok(aggregateRaces.every((result) => [200, 409].includes(result.response.status)), JSON.stringify(aggregateRaces.map((result) => result.json)));
+  const finalAggregate = await prisma.bedInventory.findUniqueOrThrow({
+    where: { hospitalId_category: { hospitalId: appointmentHospital.id, category: "VENTILATOR" } },
+  });
+  assert.ok([[4, 2], [7, 4], [5, 2]].some(([total, available]) => finalAggregate.total === total && finalAggregate.available === available));
+
 
   const serviceResponse = await request("/api/hospital/services", "POST", {
     name: "MRI",

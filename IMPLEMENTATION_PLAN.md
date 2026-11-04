@@ -1,6 +1,6 @@
 # Jeevan Sahay implementation plan and verification status
 
-**Updated:** 2026-11-03
+**Updated:** 2026-11-04
 **Working branch:** `feature/jeevan-sahay-final-completion`
 **Status:** Implementation and verification complete; no production deployment or real-user data migration was performed.
 
@@ -14,14 +14,14 @@ The existing Next.js App Router application, patient-facing design, route struct
 |---|---|
 | 0. Inspect and plan | Inspected the existing application, database, routes, tools, and repository history before implementation; wrote this phase-by-phase plan. |
 | 1. Authentication | Email verification and passwordless codes, password recovery, Google OIDC with PKCE/state checks, secure cookies, database-backed revocable sessions, server-side role checks, and rate limits. Public signup cannot grant administrative roles. |
-| 2. Patient portal | Existing UI connected to scoped profile, saved-hospital, health-share, appointment, search, emergency, and notification workflows. Appointment requests persist and remain patient-scoped. |
-| 3. Hospital portal | Verified-hospital-only portal with persistent beds, doctors, departments, services, appointments, emergency logs, profile, settings, notifications, and recorded analytics. Cross-hospital reads/writes are denied; itemised bed changes update patient-facing aggregates transactionally. |
+| 2. Patient portal | Existing UI connected to scoped profile, saved-hospital, health-share, appointment, search, emergency, and notification workflows. Health-share PINs travel only in POST bodies; short-lived share tokens are carried in URL fragments and resolved on a no-index recipient page. Appointment requests persist and remain patient-scoped. |
+| 3. Hospital portal | Verified-hospital-only portal with persistent beds, doctors, departments, services, appointments, emergency logs, profile, settings, notifications, and recorded analytics. Cross-hospital reads/writes are denied; itemised bed changes use serializable transactions, bounded lock retries, and compare-and-set inventory updates. The legacy aggregate endpoint rejects categories with itemised beds to prevent conflicting totals. |
 | 4. Admin portal | Protected overview, pending application and legacy verification queues, transactional approval/rejection, searchable account suspension/reactivation, report resolution, CSV exports, notifications, and read-only audit browsing. Sensitive actions are audited and sessions revoked when required. |
 | 5. Database/backend | Versioned SQLite baseline, indexes, and additive demo-marker migration. Fresh deploy and synthetic existing-database upgrade paths were tested; the existing-database instructions stop if schema drift is detected. |
 | 6. Real/demo data | Explicit demo markers and source labels; normal discovery excludes fixtures, sample data cannot imply confirmed capacity or care, and emergency messaging does not claim dispatch or live availability. Demo seeding is opt-in, refuses non-empty databases, and is blocked in production. |
 | 7. Notifications/email | Account, hospital decision, appointment, and report messages use the configured mail service. Local SMTP-capture and failure-handling tests pass; real delivery requires SMTP credentials. |
 | 8. UI/responsiveness | Existing portal designs retained; shared navigation and new pages support responsive layouts. Mobile menu interaction and viewport overflow are checked against the production build. |
-| 9. Testing/bug fixing | TypeScript, ESLint, scoring regression, disposable-database/local-SMTP integration tests, production build, Prisma validation/migrations, dependency audit, and push/PR CI workflow. |
+| 9. Testing/bug fixing | TypeScript, ESLint, scoring regression, disposable-database/local-SMTP integration tests, production build, Prisma validation/migrations, dependency and secret scans. |
 | 10. Render preparation | Added a manual-deploy Blueprint for one same-origin Next.js service and persistent-disk SQLite. Migrations run at service startup after disk mount; credentials and first-admin setup are documented. No service was provisioned or deployed. |
 
 ## Verification record
@@ -30,11 +30,11 @@ The existing Next.js App Router application, patient-facing design, route struct
 - `npm run lint`: passed with no errors.
 - `npm run typecheck`: passed.
 - `npm run test:scoring`: passed the emergency-priority versus routine-ranking regression.
-- `npm run test:auth`: all 26 disposable-database/local-SMTP integration checks passed across authentication, role denial, patient and hospital workflows, admin actions, migrations, audit, demo-data boundaries, explicit AI-unconfigured handling, and email failure handling.
+- `npm run test:auth`: all 26 disposable-database/local-SMTP integration checks passed across authentication, role denial, patient and hospital workflows, admin actions, audit, demo-data boundaries, explicit AI-unconfigured handling, and email failure handling. Focused regression assertions cover PIN-only POST bodies, rejection of PIN-bearing query requests, the recipient page and no-store responses, PIN-attempt throttling, and concurrent bed creation/update/aggregate edits.
 - `npx prisma validate`: schema valid. Three versioned migrations applied successfully to a fresh disposable SQLite database; status reported up to date.
-- `npm audit`: zero known vulnerabilities.
-- Gitleaks staged-change scan: no secrets found. The feature-history scan reported one false positive on generic implementation-plan prose, not a credential.
-- `npm run build`: production build passed and generated all 85 static pages plus dynamic API/portal routes.
+- `npm audit`: zero known vulnerabilities across the dependency tree.
+- Gitleaks 8.30.1 scanned the current worktree and all local Git refs: zero findings in current files and one historical false positive on ordinary admin-audit prose in `IMPLEMENTATION_PLAN.md`; no credential was exposed. The only tracked environment file is `.env.example`, which contains empty placeholders.
+- `npm run build`: final production build passed and generated 87 static pages plus dynamic API/portal routes.
 - Final-build responsive checks: `/hospitals` has no horizontal overflow at 320, 375, 390, 640, 768, 1024, 1152, 1279, 1280, and 1440 px; `/`, `/login`, and `/feedback` were checked at 320 and 390 px. The mobile menu opens; unauthenticated `/admin`, `/hospital`, and `/dashboard` requests redirect to `/login`; no browser errors were observed.
 - GitHub Actions CI was not included: the connected GitHub OAuth token lacks the `workflow` scope required to create workflow files. All listed checks were run locally; enable that scope and add CI in a follow-up if required.
 

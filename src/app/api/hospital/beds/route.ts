@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { withBedInventoryTransaction } from "@/lib/hospital/bed-inventory-transaction";
 import { auditHospitalChange, notifySavedHospitalUsers, withHospitalApi } from "@/lib/hospital/portal-api";
 import { fail, ok, parseBody } from "@/lib/api-helpers";
 
@@ -32,7 +33,7 @@ export const POST = withHospitalApi(async (req, { hospital, session }) => {
   }
 
   try {
-    const bed = await prisma.$transaction(async (tx) => {
+    const bed = await withBedInventoryTransaction(async (tx) => {
       const created = await tx.hospitalBed.create({
         data: {
           hospitalId: hospital.id,
@@ -60,7 +61,10 @@ export const POST = withHospitalApi(async (req, { hospital, session }) => {
     return ok({ bed }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return fail(409, "A bed with this ID already exists in your hospital.");
+      return fail(409, "A bed with this ID or bed inventory changed while saving. Refresh and try again.");
+    }
+    if ((error instanceof Prisma.PrismaClientKnownRequestError && ["P1008", "P2028", "P2034"].includes(error.code)) || (error instanceof Error && /database is locked|SQLITE_BUSY|write conflict|deadlock/i.test(error.message))) {
+      return fail(409, "Bed inventory changed while saving. Refresh the page and try again.");
     }
     throw error;
   }
