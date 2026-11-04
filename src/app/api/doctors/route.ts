@@ -66,15 +66,14 @@ export const GET = withApi(
       where: {
         ...(specialty ? { specialty } : {}),
         // Each token must appear in the name, so extra spaces between words
-        // (or a missing "Dr.") never break the match. SQLite LIKE is already
-        // case-insensitive for ASCII, and `mode` is unsupported on SQLite.
+        // (or a missing "Dr.") never break the match.
         ...(tokens.length
-          ? { AND: tokens.map((token) => ({ name: { contains: token } })) }
+          ? { AND: tokens.map((token) => ({ name: { contains: token, mode: "insensitive" as const } })) }
           : {}),
         hospital: {
           status: "VERIFIED",
           ...(session?.isDemo ? {} : { isDemo: false }),
-          ...(city ? { city: { contains: city } } : {}),
+          ...(city ? { city: { contains: city, mode: "insensitive" as const } } : {}),
         },
       },
       include: {

@@ -22,10 +22,10 @@ export const GET = withApi(async (req) => {
     ...(role !== "all" ? { role } : {}),
     ...(status !== "all" ? { status } : {}),
     ...(q ? { OR: [
-      { name: { contains: q } },
-      { email: { contains: q } },
-      { phone: { contains: q } },
-      { hospital: { name: { contains: q } } },
+      { name: { contains: q, mode: "insensitive" as const } },
+      { email: { contains: q, mode: "insensitive" as const } },
+      { phone: { contains: q, mode: "insensitive" as const } },
+      { hospital: { name: { contains: q, mode: "insensitive" as const } } },
     ] } : {}),
   };
   const [users, total] = await Promise.all([

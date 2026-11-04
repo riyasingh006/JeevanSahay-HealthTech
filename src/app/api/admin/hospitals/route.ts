@@ -20,11 +20,11 @@ export const GET = withApi(async (req) => {
   if (!parsed.success) return fail(400, "Invalid hospital filters.");
   const { status, page, pageSize, q } = parsed.data;
   const searchWhere = q ? { OR: [
-    { name: { contains: q } },
-    { registrationNumber: { contains: q } },
-    { city: { contains: q } },
-    { state: { contains: q } },
-    { email: { contains: q } },
+    { name: { contains: q, mode: "insensitive" as const } },
+    { registrationNumber: { contains: q, mode: "insensitive" as const } },
+    { city: { contains: q, mode: "insensitive" as const } },
+    { state: { contains: q, mode: "insensitive" as const } },
+    { email: { contains: q, mode: "insensitive" as const } },
   ] } : {};
   const where = status === "all" ? searchWhere : { ...searchWhere, status };
   const [hospitals, total, pendingCount, verifiedCount, rejectedCount] = await Promise.all([

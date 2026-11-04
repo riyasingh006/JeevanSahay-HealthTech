@@ -27,12 +27,12 @@ export const GET = withApi(async (req) => {
   const where = {
     ...(status === "ALL" ? {} : { status }),
     ...(q ? { OR: [
-      { subject: { contains: q } },
-      { message: { contains: q } },
-      { category: { contains: q } },
-      { relatedHospital: { contains: q } },
-      { reporterName: { contains: q } },
-      { contactEmail: { contains: q } },
+      { subject: { contains: q, mode: "insensitive" as const } },
+      { message: { contains: q, mode: "insensitive" as const } },
+      { category: { contains: q, mode: "insensitive" as const } },
+      { relatedHospital: { contains: q, mode: "insensitive" as const } },
+      { reporterName: { contains: q, mode: "insensitive" as const } },
+      { contactEmail: { contains: q, mode: "insensitive" as const } },
     ] } : {}),
   };
   const [reports, total] = await Promise.all([

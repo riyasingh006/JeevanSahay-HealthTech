@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
+import { loadEnvFile } from "node:process";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 import {
   bedInventoryByType,
@@ -16,8 +16,17 @@ import {
 import { LlmCallError, streamAiReply } from "../src/lib/llm";
 
 const root = process.cwd();
-const tempDir = mkdtempSync(path.join(os.tmpdir(), "jeevan-sahay-auth-"));
-const databaseUrl = `file:${path.join(tempDir, "auth.db")}`;
+if (existsSync(path.join(root, ".env"))) loadEnvFile(path.join(root, ".env"));
+const databaseUrl = process.env.TEST_DATABASE_URL;
+if (!databaseUrl) throw new Error("Set TEST_DATABASE_URL to a disposable local PostgreSQL database whose name includes 'test'.");
+const testDatabase = new URL(databaseUrl);
+const testDatabaseName = decodeURIComponent(testDatabase.pathname.replace(/^\//, ""));
+if (!/^postgres(?:ql)?:$/.test(testDatabase.protocol) || !["localhost", "127.0.0.1", "::1"].includes(testDatabase.hostname) || !/(^|[-_])test($|[-_])/i.test(testDatabaseName)) {
+  throw new Error("TEST_DATABASE_URL must target a local PostgreSQL database with 'test' in its name; remote and non-test databases are refused.");
+}
+if (databaseUrl === process.env.DATABASE_URL || databaseUrl === process.env.DIRECT_URL) {
+  throw new Error("TEST_DATABASE_URL must be separate from application database URLs.");
+}
 const messages: string[] = [];
 let smtpServer: net.Server | undefined;
 let app: ChildProcess | undefined;
@@ -170,9 +179,9 @@ async function registerPatient(email: string, password: string) {
 }
 
 async function startApp() {
-  const dbResult = spawnSync("npx", ["prisma", "db", "push", "--skip-generate"], {
+  const dbResult = spawnSync("npx", ["prisma", "db", "push", "--force-reset", "--skip-generate"], {
     cwd: root,
-    env: { ...process.env, DATABASE_URL: databaseUrl },
+    env: { ...process.env, DATABASE_URL: databaseUrl, DIRECT_URL: databaseUrl },
     encoding: "utf8",
     timeout: 60_000,
   });
@@ -184,6 +193,7 @@ async function startApp() {
     ...process.env,
     NODE_ENV: "development",
     DATABASE_URL: databaseUrl,
+    DIRECT_URL: databaseUrl,
     SESSION_SECRET: randomBytes(32).toString("hex"),
     SMTP_HOST: "127.0.0.1",
     SMTP_PORT: String(smtpPort),
@@ -236,7 +246,6 @@ async function closeApp() {
     if (!smtpServer?.listening) return resolve();
     smtpServer.close(() => resolve());
   });
-  rmSync(tempDir, { recursive: true, force: true });
 }
 
 async function main() {
@@ -545,7 +554,7 @@ async function main() {
   const demoSearchResult = demoPatientSearch.json.data.results.find((item: { hospital: { id: string } }) => item.hospital.id === demoHospital.id);
   assert.equal(demoSearchResult?.hospital.isDemo, true);
 
-  const doctorSearchUrl = `/api/doctors?q=${encodeURIComponent(demoDoctor.name)}`;
+  const doctorSearchUrl = `/api/doctors?q=${encodeURIComponent(demoDoctor.name.toUpperCase())}`;
   const normalDoctorSearch = await request(doctorSearchUrl, "GET", undefined, patientSessionCookie);
   assert.equal(normalDoctorSearch.response.status, 200, JSON.stringify(normalDoctorSearch.json));
   assert.ok(!normalDoctorSearch.json.data.doctors.some((item: { id: string }) => item.id === demoDoctor.id));
@@ -929,7 +938,7 @@ async function main() {
   assert.equal(reportSubmission.json.data.emailDelivery, "sent");
   assert.equal(messages.length, beforeReportEmail + 1);
   const report = await prisma.report.findUniqueOrThrow({ where: { id: reportSubmission.json.data.reportId } });
-  const reportList = await request("/api/admin/reports?status=ALL&q=Admin%20integration", "GET", undefined, adminCookie);
+  const reportList = await request("/api/admin/reports?status=ALL&q=ADMIN%20INTEGRATION", "GET", undefined, adminCookie);
   assert.equal(reportList.response.status, 200, JSON.stringify(reportList.json));
   assert.ok(reportList.json.data.reports.some((item: { id: string }) => item.id === report.id));
   const patientReportsDenied = await request("/api/admin/reports?status=ALL", "GET", undefined, patientSessionCookie);
@@ -999,7 +1008,7 @@ async function main() {
   assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: managedUser.id } })).authVersion, managedUser.authVersion + 1);
   const reactivateManagedUser = await request("/api/admin/users", "PATCH", { userId: managedUser.id, status: "ACTIVE" }, adminCookie);
   assert.equal(reactivateManagedUser.response.status, 200, JSON.stringify(reactivateManagedUser.json));
-  const managedUsers = await request("/api/admin/users?page=1&pageSize=10&q=managed-account&role=PATIENT&status=ACTIVE", "GET", undefined, adminCookie);
+  const managedUsers = await request("/api/admin/users?page=1&pageSize=10&q=MANAGED-ACCOUNT&role=PATIENT&status=ACTIVE", "GET", undefined, adminCookie);
   assert.equal(managedUsers.response.status, 200, JSON.stringify(managedUsers.json));
   assert.ok(managedUsers.json.data.users.some((item: { id: string; passwordHash?: string }) => item.id === managedUser.id && item.passwordHash === undefined));
   const suspendSelf = await request("/api/admin/users", "PATCH", { userId: adminRecord.id, status: "SUSPENDED" }, adminCookie);

@@ -35,7 +35,7 @@ class BedInventoryConflictError extends Error {}
 function isDatabaseConflict(error: unknown) {
   return (
     (error instanceof Prisma.PrismaClientKnownRequestError && ["P1008", "P2002", "P2025", "P2028", "P2034"].includes(error.code)) ||
-    (error instanceof Error && /database is locked|SQLITE_BUSY|write conflict|deadlock/i.test(error.message))
+    (error instanceof Error && /write conflict|deadlock/i.test(error.message))
   );
 }
 

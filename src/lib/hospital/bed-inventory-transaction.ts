@@ -6,7 +6,7 @@ function isRetryableWriteConflict(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     return ["P1008", "P2028", "P2034"].includes(error.code);
   }
-  return error instanceof Error && /database is locked|SQLITE_BUSY|write conflict|deadlock/i.test(error.message);
+  return error instanceof Error && /write conflict|deadlock/i.test(error.message);
 }
 
 export async function withBedInventoryTransaction<T>(

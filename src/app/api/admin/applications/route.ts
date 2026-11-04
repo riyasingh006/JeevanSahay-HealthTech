@@ -26,11 +26,11 @@ export const GET = withApi(async (req) => {
   if (!parsed.success) return fail(400, "Invalid application filters.");
   const { status, page, pageSize, q } = parsed.data;
   const searchWhere = q ? { OR: [
-    { hospitalName: { contains: q } },
-    { registrationNumber: { contains: q } },
-    { city: { contains: q } },
-    { state: { contains: q } },
-    { user: { email: { contains: q } } },
+    { hospitalName: { contains: q, mode: "insensitive" as const } },
+    { registrationNumber: { contains: q, mode: "insensitive" as const } },
+    { city: { contains: q, mode: "insensitive" as const } },
+    { state: { contains: q, mode: "insensitive" as const } },
+    { user: { email: { contains: q, mode: "insensitive" as const } } },
   ] } : {};
   const where = status === "all" ? searchWhere : { ...searchWhere, status };
   const [applications, total, pendingCount, verifiedCount, rejectedCount] = await Promise.all([
