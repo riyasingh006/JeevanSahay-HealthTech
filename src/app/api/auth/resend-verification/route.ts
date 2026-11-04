@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { issueAuthOtp } from "@/lib/otp";
+import { isEmailDeliveryConfigured } from "@/lib/email";
 import { check } from "@/lib/rate-limit";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
 
 const schema = z.object({ email: z.string().trim().toLowerCase().email().max(254) });
-const message = "If this address is awaiting verification, a new code will be sent when the resend limit allows it.";
+const message = "If this address is awaiting verification, a new code will be sent when email delivery is available. Check spam or contact support if it does not arrive.";
 
 export const POST = withApi(
   async (req) => {
@@ -18,6 +19,7 @@ export const POST = withApi(
       });
     }
 
+    const smtpConfigured = isEmailDeliveryConfigured();
     const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
     if (user && !user.emailVerifiedAt && user.status !== "SUSPENDED") {
       const result = await issueAuthOtp({
@@ -31,7 +33,7 @@ export const POST = withApi(
       }
     }
 
-    return ok({ message });
+    return ok({ message, smtpConfigured });
   },
   { limit: 10, windowMs: 60_000, keyPrefix: "resend-verification" }
 );

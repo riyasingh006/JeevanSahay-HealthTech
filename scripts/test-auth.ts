@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { loadEnvFile } from "node:process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import net from "node:net";
 import path from "node:path";
@@ -175,6 +175,10 @@ async function registerPatient(email: string, password: string) {
   });
   assert.equal(response.status, 201, JSON.stringify(json));
   assert.equal(json.data.emailVerificationRequired, true);
+  assert.equal(json.data.deliveryPending, false);
+  const code = codeFor(email);
+  assert.ok(!JSON.stringify(json).includes(code));
+  assert.ok(!appOutput.includes(`Use ${code}`));
   return json;
 }
 
@@ -279,6 +283,17 @@ async function main() {
 
   const strongPassword = "LongEnough!Pass123";
 
+  const hospitalSignupPage = await fetch(`${baseUrl}/signup?role=HOSPITAL_ADMIN`);
+  assert.equal(hospitalSignupPage.status, 200);
+  const hospitalSignupHtml = await hospitalSignupPage.text();
+  assert.match(hospitalSignupHtml, /Register your hospital/);
+  assert.match(hospitalSignupHtml, /Official email address/);
+  assert.match(hospitalSignupHtml, /Registration \/ licence number/);
+  const loginPage = await fetch(`${baseUrl}/login`);
+  assert.equal(loginPage.status, 200);
+  assert.match(await loginPage.text(), /Register your hospital/);
+  console.log("PASS public login links directly to the existing hospital application form without adding a signup role");
+
   const invalidAdminEmail = testEmail("admin-signup");
   const adminSignup = await request("/api/auth/register", "POST", {
     name: "Should Not Become Admin",
@@ -324,7 +339,26 @@ async function main() {
   const resendBefore = mailCount(patientEmail);
   const resend = await request("/api/auth/resend-verification", "POST", { email: patientEmail });
   assert.equal(resend.response.status, 200);
+  assert.equal(resend.json.data.smtpConfigured, true);
   assert.equal(mailCount(patientEmail), resendBefore);
+  const patientRecordForResend = await prisma.user.findUniqueOrThrow({ where: { email: patientEmail } });
+  await prisma.authOtp.update({
+    where: { userId_purpose: { userId: patientRecordForResend.id, purpose: "EMAIL_VERIFICATION" } },
+    data: { lastSentAt: new Date(Date.now() - 61_000) },
+  });
+  const resent = await request("/api/auth/resend-verification", "POST", { email: patientEmail });
+  assert.equal(resent.response.status, 200);
+  assert.equal(mailCount(patientEmail), resendBefore + 1);
+  const unknownResend = await request("/api/auth/resend-verification", "POST", { email: testEmail("unknown-resend") });
+  assert.deepEqual(unknownResend.json.data, resent.json.data);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const allowedResend = await request("/api/auth/resend-verification", "POST", { email: patientEmail });
+    assert.equal(allowedResend.response.status, 200);
+  }
+  const limitedResend = await request("/api/auth/resend-verification", "POST", { email: patientEmail });
+  assert.equal(limitedResend.response.status, 429);
+  assert.ok(limitedResend.json.retryAfterSeconds > 0);
+  console.log("PASS verification resend cooldown, rate limiting and non-enumerating responses");
   const invalidCode = await request("/api/auth/verify-email", "POST", { email: patientEmail, code: "000000" });
   assert.equal(invalidCode.response.status, 400);
   const patientCode = codeFor(patientEmail);
@@ -370,8 +404,11 @@ async function main() {
   assert.ok(login.response.headers.getSetCookie().some((cookie) => cookie.startsWith("js_session=") && cookie.includes("Max-Age=43200")));
   const loginCookie = cookieFrom(login.response, "js_session");
 
-  await request("/api/auth/password/forgot", "POST", { email: patientEmail });
+  const recoveryRequest = await request("/api/auth/password/forgot", "POST", { email: patientEmail });
+  assert.equal(recoveryRequest.response.status, 200);
   const resetCode = codeFor(patientEmail);
+  assert.ok(!JSON.stringify(recoveryRequest.json).includes(resetCode));
+  assert.ok(!appOutput.includes(`Use ${resetCode}`));
   const resetVerify = await request("/api/auth/password/verify", "POST", { email: patientEmail, code: resetCode });
   assert.equal(resetVerify.response.status, 200, JSON.stringify(resetVerify.json));
   const resetCookie = cookieFrom(resetVerify.response, "js_password_reset");
@@ -665,7 +702,11 @@ async function main() {
   await registerPatient(otpEmail, strongPassword);
   const otpVerifyEmail = await request("/api/auth/verify-email", "POST", { email: otpEmail, code: codeFor(otpEmail) });
   assert.equal(otpVerifyEmail.response.status, 200);
-  await request("/api/auth/email-code/request", "POST", { email: otpEmail });
+  const otpRequest = await request("/api/auth/email-code/request", "POST", { email: otpEmail });
+  assert.equal(otpRequest.response.status, 200);
+  assert.equal(otpRequest.json.data.smtpConfigured, true);
+  const passwordlessCode = codeFor(otpEmail);
+  assert.ok(!JSON.stringify(otpRequest.json).includes(passwordlessCode));
   const otpLogin = await request("/api/auth/email-code/verify", "POST", { email: otpEmail, code: codeFor(otpEmail), rememberMe: true });
   assert.equal(otpLogin.response.status, 200, JSON.stringify(otpLogin.json));
   const otpCookie = cookieFrom(otpLogin.response, "js_session");
@@ -725,6 +766,37 @@ async function main() {
   const adminRecord = await prisma.user.findUniqueOrThrow({ where: { email: adminEmail } });
   assert.equal(adminRecord.role, "SUPER_ADMIN");
   assert.ok(adminRecord.emailVerifiedAt);
+  const bootstrapEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    NODE_ENV: "test",
+    DATABASE_URL: databaseUrl,
+    SEED_DEMO_DATA: "false",
+    SEED_SUPER_ADMIN_EMAIL: adminEmail,
+    SEED_SUPER_ADMIN_PASSWORD: adminPassword,
+  };
+  const idempotentBootstrap = spawnSync("npx", ["tsx", "prisma/seed.ts"], {
+    cwd: root,
+    env: bootstrapEnv,
+    encoding: "utf8",
+    timeout: 60_000,
+  });
+  assert.equal(idempotentBootstrap.status, 0, idempotentBootstrap.stderr);
+  const secondAdminEmail = testEmail("second-super-admin");
+  const secondBootstrap = spawnSync("npx", ["tsx", "prisma/seed.ts"], {
+    cwd: root,
+    env: {
+      ...bootstrapEnv,
+      SEED_SUPER_ADMIN_EMAIL: secondAdminEmail,
+      SEED_SUPER_ADMIN_PASSWORD: "TestOnly!SecondAdmin123",
+    },
+    encoding: "utf8",
+    timeout: 60_000,
+  });
+  assert.notEqual(secondBootstrap.status, 0);
+  assert.match(`${secondBootstrap.stdout}${secondBootstrap.stderr}`, /already been provisioned/);
+  assert.equal(await prisma.user.findUnique({ where: { email: secondAdminEmail } }), null);
+  assert.equal(await prisma.user.count({ where: { role: "SUPER_ADMIN" } }), 1);
+  console.log("PASS super-admin bootstrap is idempotent, refuses non-admin promotion, and cannot create a second admin");
   const promotion = spawnSync("npx", ["tsx", "prisma/seed.ts"], {
     cwd: root,
     env: {
@@ -1302,20 +1374,64 @@ async function main() {
 
   const oauthStart = await fetch(`${baseUrl}/api/auth/google`, { redirect: "manual" });
   assert.equal(oauthStart.status, 307);
-  assert.ok(oauthStart.headers.get("location")?.startsWith("https://accounts.google.com/"));
-  const oauthState = oauthStart.headers.getSetCookie().find((cookie) => cookie.startsWith("google_oauth_state="))?.split(";", 1)[0].split("=", 2)[1];
+  const authorizeUrl = new URL(oauthStart.headers.get("location")!);
+  assert.equal(authorizeUrl.origin, "https://accounts.google.com");
+  assert.equal(authorizeUrl.searchParams.get("response_type"), "code");
+  assert.equal(authorizeUrl.searchParams.get("client_id"), "test-client.apps.googleusercontent.com");
+  assert.equal(authorizeUrl.searchParams.get("redirect_uri"), `${baseUrl}/api/auth/google/callback`);
+  assert.equal(authorizeUrl.searchParams.get("code_challenge_method"), "S256");
+  assert.ok(authorizeUrl.searchParams.get("state"));
+  assert.ok(authorizeUrl.searchParams.get("nonce"));
+  const oauthCookies = oauthStart.headers.getSetCookie();
+  const cookieValue = (name: string) => oauthCookies
+    .find((cookie) => cookie.startsWith(`${name}=`))
+    ?.split(";", 1)[0]
+    .slice(name.length + 1) ?? "";
+  const oauthState = cookieValue("google_oauth_state");
+  const oauthNonce = cookieValue("google_oauth_nonce");
+  const oauthVerifier = cookieValue("google_oauth_verifier");
+  assert.equal(authorizeUrl.searchParams.get("state"), oauthState);
+  assert.equal(authorizeUrl.searchParams.get("nonce"), oauthNonce);
+  assert.equal(
+    authorizeUrl.searchParams.get("code_challenge"),
+    createHash("sha256").update(oauthVerifier).digest("base64url")
+  );
+  assert.equal(oauthStart.headers.get("cache-control"), "no-store, max-age=0");
+  assert.equal(oauthStart.headers.get("referrer-policy"), "no-referrer");
   const oauthCallback = await fetch(`${baseUrl}/api/auth/google/callback?code=invalid&state=wrong-state`, {
-    headers: { Cookie: `google_oauth_state=${oauthState ?? "present"}; google_oauth_nonce=nonce; google_oauth_verifier=verifier` },
+    headers: { Cookie: `google_oauth_state=${oauthState}; google_oauth_nonce=${oauthNonce}; google_oauth_verifier=${oauthVerifier}` },
     redirect: "manual",
   });
   assert.equal(oauthCallback.status, 307);
   assert.ok(oauthCallback.headers.get("location")?.includes("error=google_state_mismatch"));
-  console.log("PASS Google OAuth initiation uses PKCE and rejects a mismatched state");
+  assert.equal(oauthCallback.headers.get("cache-control"), "no-store, max-age=0");
+  assert.equal(oauthCallback.headers.get("referrer-policy"), "no-referrer");
+  console.log("PASS Google OAuth uses authorization code + PKCE, binds state/nonce cookies, and rejects state replay");
 
   await new Promise<void>((resolve, reject) => {
     if (!smtpServer?.listening) return resolve();
     smtpServer.close((error) => error ? reject(error) : resolve());
   });
+  const undeliverableEmail = testEmail("smtp-outage");
+  const undeliverable = await request("/api/auth/register", "POST", {
+    name: "SMTP Outage Test",
+    email: undeliverableEmail,
+    phone: "+91 9810012345",
+    password: strongPassword,
+    role: "PATIENT",
+  });
+  assert.equal(undeliverable.response.status, 201);
+  assert.equal(undeliverable.json.data.deliveryPending, true);
+  assert.doesNotMatch(JSON.stringify(undeliverable.json), /\b\d{6}\b/);
+  assert.doesNotMatch(appOutput, /Use \d{6}/);
+  assert.doesNotMatch(appOutput, /test-password|SMTP_PASSWORD/);
+  const undeliverableUser = await prisma.user.findUniqueOrThrow({ where: { email: undeliverableEmail } });
+  assert.equal(undeliverableUser.emailVerifiedAt, null);
+  const undeliverableOtp = await prisma.authOtp.findUniqueOrThrow({
+    where: { userId_purpose: { userId: undeliverableUser.id, purpose: "EMAIL_VERIFICATION" } },
+  });
+  assert.ok(undeliverableOtp.consumedAt);
+  console.log("PASS SMTP outage is reported without exposing codes or credentials, and unverified accounts remain locked");
   const outageReport = await request("/api/reports", "POST", {
     category: "OTHER",
     subject: "Notification outage integration check",

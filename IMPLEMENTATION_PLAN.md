@@ -49,3 +49,40 @@ The first super-admin must be provisioned against the intended deployment databa
 ## Delivery status
 
 GitHub reports that the feature branch through `a51f364` was merged into `main` via PR #1 (merge commit `c79b641`) on 2026-11-04. The PostgreSQL migration changes are follow-up work on the same feature branch and are not part of that merged PR. This workflow has not created another PR, merged code, or deployed the application.
+
+## Authentication and registration follow-up audit (2026-11-04)
+
+### Confirmed findings before changes
+
+- Hospital applications already use the public `/signup?role=HOSPITAL_ADMIN` form and `POST /api/auth/register`; applications are stored pending, email verification is required, and approval alone links an approved hospital account. The login page lacked a direct hospital-registration link.
+- Public registration accepts only `PATIENT` and `HOSPITAL_ADMIN`; admin pages and APIs enforce roles server-side. Bootstrap refused non-admin promotion but could previously create another super-admin with a different email.
+- Google OAuth already used authorization code, PKCE, state, nonce, remote JWKS signature checks, issuer/audience validation and database-backed sessions. Its origin fallback ignored Render's `RENDER_EXTERNAL_URL` and had no production HTTPS guard. No Google credentials or Cloud Console settings were available to inspect the live failing request.
+- The local runtime and `.env` contained no SMTP configuration. OTPs were HMAC-hashed, five-minute, attempt-limited and not returned/logged. The resend UI read the wrong response property and some flows implied delivery even when SMTP was unavailable.
+- The Render Blueprint targeted Free and defaulted SMTP to port 587. Render's official limits block Free web-service egress on ports 25, 465 and 587, so SMTP on that default cannot work there. Provider support for alternate port 2525 must be confirmed.
+
+### Phase-by-phase implementation plan and result
+
+| Phase | Work | Result and gate |
+|---|---|---|
+| A. Google OAuth hardening | Derive one canonical public origin using `NEXT_PUBLIC_APP_URL` or Render's public URL; validate HTTPS and the exact callback; retain PKCE/state/nonce/JWKS checks; add no-store/no-referrer headers and offline tests. | Complete. OAuth URL tests, integration checks, TypeScript and lint pass. Production rejects missing/insecure public origins; localhost HTTP is allowed only in development. |
+| B. Email OTP diagnosis and feedback | Surface missing SMTP configuration without account enumeration; fix resend response parsing; require production STARTTLS; sanitize mail logs; test delivery, cooldown, failure and non-disclosure. | Complete. Local SMTP-capture integration tests pass. Render Blueprint now defaults to 2525; a provider limited to 25/465/587 needs an HTTPS mail API or a host that permits SMTP. |
+| C. Hospital registration entry | Add a direct Register Hospital link into the existing application form; clarify hospital fields and pending approval; state that public admin signup is disabled. | Complete. Existing `/signup?role=HOSPITAL_ADMIN` and API are reused; UI and pending/approval tests pass; no schema change. |
+| D. One-time super-admin bootstrap | Create only the first configured super-admin; preserve same-account idempotence and reject non-admin promotion or additional admins. | Complete. Seed integration tests pass for creation, idempotence, non-admin protection and second-admin refusal. |
+| E. Verification and report | Run integration, OAuth, scoring, lint, typecheck, audit and production build; review remaining external requirements. | Complete locally. No live Google, SMTP-provider or Neon credentials were available; no deploy, push, merge or new PR was performed. |
+
+### Authentication follow-up verification
+
+- `npm run test:auth`: all 30 local-PostgreSQL/local-SMTP integration checks passed, including patient registration/login, OTP expiry/rate limits/non-disclosure, password reset, hospital registration/approval/rejection, admin authorization/bootstrap, session revocation and logout.
+- `npm run test:oauth`: passed HTTPS/public-origin/callback policy tests. The integration suite passed authorization-code, PKCE, state/nonce-cookie binding and replay rejection checks.
+- `npm run typecheck`, `npm run lint`, `npm run test:scoring`, `npm audit` and `npm run build`: passed; the dependency audit reported zero vulnerabilities.
+- Live Google login and real SMTP delivery remain unverified because provider credentials and deployed service settings are unavailable. Follow `README.md` for exact Google, SMTP, Render Free and bootstrap configuration.
+
+### Implementation and verification result
+
+- **A. Google OAuth:** Complete. Production uses the configured public HTTPS origin or Render’s `RENDER_EXTERNAL_URL`; explicit callback URLs are validated for same origin and exact callback path. Authorization-code exchange continues to require PKCE, state and nonce, and verified Google signing keys/claims. Responses use `no-store`/`no-referrer`; no security checks were disabled.
+- **B. Email OTP:** Complete in code. Delivery failures are surfaced for registration, missing SMTP settings are reported without exposing whether an arbitrary email is registered, resend feedback reads the correct API fields, and production STARTTLS is required when implicit TLS is off. Render Free blocks SMTP ports 25/465/587; the Blueprint now defaults to 2525, which still requires provider support.
+- **C. Hospital registration:** Complete without a new database model or route. The public `/signup?role=HOSPITAL_ADMIN` form and `POST /api/auth/register` are linked from login, clearly labelled for official hospital contact/licence details, and retain email-verification and admin-approval gates.
+- **D. Admin bootstrap:** Complete. Public signup remains limited to patient/hospital roles; the seed now atomically creates at most the first super-admin, is idempotent for that same account, and refuses promotion or additional admin creation.
+- **Verification:** `npm run test:auth` passed all 30 integration checks against a disposable local PostgreSQL database and SMTP capture; `npm run test:oauth`, `npm run test:scoring`, `npm run typecheck`, `npm run lint`, `npm audit` (0 vulnerabilities), `npm run build` (87 static pages plus dynamic routes), and `git diff --check` passed.
+- **External limits:** Google Cloud credentials/settings, SMTP credentials/provider connectivity, and Neon credentials were unavailable. Therefore live Google login and real-user mail delivery were not tested; no Neon data or schema was changed. Render’s Blueprint change is not deployed.
+- **Delivery at audit completion:** The authentication changes were uncommitted on `feature/jeevan-sahay-final-completion`; no push, deployment or new PR had been performed at that point. PR #1 was already merged.

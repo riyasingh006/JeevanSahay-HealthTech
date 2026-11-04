@@ -96,10 +96,18 @@ export async function issueAuthOtp(input: {
       where: { id: challengeId, codeHash },
       data: { consumedAt: new Date() },
     });
+    const diagnostic = error && typeof error === "object"
+      ? error as { code?: unknown; responseCode?: unknown }
+      : {};
+    const errorCode = typeof diagnostic.code === "string" && /^[A-Z0-9_]{1,40}$/.test(diagnostic.code)
+      ? diagnostic.code
+      : "UNKNOWN";
+    const responseCode = typeof diagnostic.responseCode === "number" ? diagnostic.responseCode : undefined;
     console.error("[auth] OTP email delivery failed", {
       userId: input.userId,
       purpose: input.purpose,
-      message: error instanceof Error ? error.message : "unknown mail error",
+      errorCode,
+      ...(responseCode === undefined ? {} : { responseCode }),
     });
     return { sent: false, reason: "DELIVERY_FAILED" };
   }

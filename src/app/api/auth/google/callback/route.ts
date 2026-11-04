@@ -10,6 +10,7 @@ import {
   writeAudit,
   type Role,
 } from "@/lib/auth";
+import { resolveGoogleOAuthUrls } from "@/lib/google-oauth-url";
 
 const GOOGLE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 const OAUTH_COOKIES = ["google_oauth_state", "google_oauth_nonce", "google_oauth_verifier"];
@@ -22,11 +23,6 @@ type GoogleClaims = {
   nonce?: string;
 };
 
-function getBaseUrl(req: NextRequest): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL;
-  if (configured) return new URL(configured).origin;
-  return req.nextUrl.origin;
-}
 
 function clearOAuthCookies(response: NextResponse): NextResponse {
   for (const name of OAUTH_COOKIES) {
@@ -39,6 +35,9 @@ function clearOAuthCookies(response: NextResponse): NextResponse {
       expires: new Date(0),
     });
   }
+  response.headers.set("Cache-Control", "no-store, max-age=0");
+  response.headers.set("Pragma", "no-cache");
+  response.headers.set("Referrer-Policy", "no-referrer");
   return response;
 }
 
@@ -77,7 +76,16 @@ async function verifyIdToken(idToken: string, clientId: string): Promise<GoogleC
   const { payload } = await jwtVerify(idToken, GOOGLE_JWKS, {
     issuer: ["https://accounts.google.com", "accounts.google.com"],
     audience: clientId,
+    requiredClaims: ["exp", "iat", "iss", "aud", "sub"],
   });
+  const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  if (
+    typeof payload.iat !== "number" ||
+    payload.iat > Math.floor(Date.now() / 1000) + 60 ||
+    (audiences.length > 1 && payload.azp !== clientId)
+  ) {
+    throw new Error("google_id_token_invalid");
+  }
   return payload as GoogleClaims;
 }
 
@@ -154,12 +162,28 @@ function homeForRole(role: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  let baseUrl: string;
+  let urls: ReturnType<typeof resolveGoogleOAuthUrls>;
   try {
-    baseUrl = getBaseUrl(req);
+    urls = resolveGoogleOAuthUrls(req.nextUrl.origin, {
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
+      renderExternalUrl: process.env.RENDER_EXTERNAL_URL,
+      redirectUri: process.env.GOOGLE_REDIRECT_URI,
+      production: process.env.NODE_ENV === "production",
+    });
   } catch {
-    return redirectError(req.nextUrl.origin, "google_config_missing");
+    return clearOAuthCookies(new NextResponse(
+      "Google sign-in is unavailable until a valid public HTTPS callback is configured.",
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          Pragma: "no-cache",
+          "Referrer-Policy": "no-referrer",
+        },
+      }
+    ));
   }
+  const { baseUrl, redirectUri } = urls;
 
   const url = req.nextUrl;
   const oauthError = url.searchParams.get("error");
@@ -183,7 +207,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${baseUrl}/api/auth/google/callback`;
     const idToken = await exchangeCode(code, redirectUri, verifier);
     const claims = await verifyIdToken(idToken, clientId);
     if (

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { issueAuthOtp } from "@/lib/otp";
+import { isEmailDeliveryConfigured } from "@/lib/email";
 import { check } from "@/lib/rate-limit";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
 
@@ -38,7 +39,8 @@ export const POST = withApi(
     }
 
     return ok({
-      message: "If this address belongs to an eligible account, a sign-in code has been sent.",
+      message: "If this address belongs to an eligible account, a sign-in code will be sent when email delivery is available. If it does not arrive, check spam or contact support.",
+      smtpConfigured: isEmailDeliveryConfigured(),
     });
   },
   { limit: 12, windowMs: 60_000, keyPrefix: "passwordless-request" }
