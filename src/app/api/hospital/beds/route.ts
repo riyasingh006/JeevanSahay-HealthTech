@@ -63,7 +63,7 @@ export const POST = withHospitalApi(async (req, { hospital, session }) => {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return fail(409, "A bed with this ID or bed inventory changed while saving. Refresh and try again.");
     }
-    if ((error instanceof Prisma.PrismaClientKnownRequestError && ["P1008", "P2028", "P2034"].includes(error.code)) || (error instanceof Error && /database is locked|SQLITE_BUSY|write conflict|deadlock/i.test(error.message))) {
+    if ((error instanceof Prisma.PrismaClientKnownRequestError && ["P1008", "P2028", "P2034"].includes(error.code)) || (error instanceof Error && /write conflict|deadlock/i.test(error.message))) {
       return fail(409, "Bed inventory changed while saving. Refresh the page and try again.");
     }
     throw error;

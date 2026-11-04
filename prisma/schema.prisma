@@ -1,14 +1,13 @@
 // जीवन Sahay — Prisma schema
-// Local development uses SQLite. For production, switch the provider to
-// "postgresql" and update DATABASE_URL — no model changes are required.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {

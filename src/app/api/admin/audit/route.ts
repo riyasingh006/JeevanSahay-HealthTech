@@ -29,13 +29,13 @@ export const GET = withApi(async (req) => {
   if ((from && !start) || (to && !end)) return fail(400, "Date filters must be valid dates.");
   if (start && end && start > end) return fail(400, "The start date must not be after the end date.");
   const where = {
-    ...(action ? { action: { contains: action } } : {}),
+    ...(action ? { action: { contains: action, mode: "insensitive" as const } } : {}),
     ...(start || end ? { createdAt: { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) } } : {}),
     ...(q ? { OR: [
-      { action: { contains: q } },
-      { entityType: { contains: q } },
-      { actorEmail: { contains: q } },
-      { entityId: { contains: q } },
+      { action: { contains: q, mode: "insensitive" as const } },
+      { entityType: { contains: q, mode: "insensitive" as const } },
+      { actorEmail: { contains: q, mode: "insensitive" as const } },
+      { entityId: { contains: q, mode: "insensitive" as const } },
     ] } : {}),
   };
   const [entries, total] = await Promise.all([
