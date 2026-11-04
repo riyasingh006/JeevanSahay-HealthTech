@@ -96,7 +96,7 @@ function SignupForm() {
 
       <div className="relative space-y-5">
         <div className="mx-auto w-full text-center">
-          <h1 className="text-2xl font-bold text-primary-950">Create account</h1>
+          <h1 className="text-2xl font-bold text-primary-950">{role === "PATIENT" ? "Create account" : "Register your hospital"}</h1>
           <p className="mt-1 text-sm text-slate-600">
             {role === "PATIENT"
               ? "Register to save hospitals, track bed availability and manage your health profile."
@@ -107,7 +107,11 @@ function SignupForm() {
         <Card>
           <CardHeader>
             <CardTitle>{role === "PATIENT" ? "Patient registration" : "Hospital application"}</CardTitle>
-            <CardDescription>All fields marked * are required. Email verification is required before activation.</CardDescription>
+            <CardDescription>
+              {role === "PATIENT"
+                ? "All fields marked * are required. Verify your email to activate your account."
+                : "All fields marked * are required. Verify the official email; portal access remains locked until an administrator approves the application."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-4">
@@ -138,7 +142,7 @@ function SignupForm() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email address *</Label>
+                <Label htmlFor="email">{role === "PATIENT" ? "Email address" : "Official email address"} *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -151,7 +155,7 @@ function SignupForm() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="phone">Phone number *</Label>
+                <Label htmlFor="phone">{role === "PATIENT" ? "Phone number" : "Hospital contact number"} *</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -186,7 +190,7 @@ function SignupForm() {
                       </select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="registration-number">Registration number</Label>
+                      <Label htmlFor="registration-number">Registration / licence number (if applicable)</Label>
                       <Input id="registration-number" maxLength={80} value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} />
                     </div>
                   </div>

@@ -27,8 +27,8 @@ function VerifyEmailForm() {
   const [verified, setVerified] = React.useState(false);
   const [message, setMessage] = React.useState(
     params.get("delivery") === "pending"
-      ? "Your account is saved, but we could not confirm email delivery. Check your mail settings, then request a new code."
-      : "Enter the six-digit code we sent to your email. It expires after five minutes."
+      ? "Your account is saved, but we could not send the verification code. Please contact the site administrator before trying again."
+      : "Enter the six-digit code sent to your email, if delivery is available. It expires after five minutes; check spam or contact the site administrator if it does not arrive."
   );
   const [error, setError] = React.useState("");
 
@@ -53,7 +53,8 @@ function VerifyEmailForm() {
         setError(result.error ?? "That code could not be verified.");
         return;
       }
-      if (result.hospitalApplicationPending) {
+      const data = result.data;
+      if (data?.hospitalApplicationPending) {
         setVerified(true);
         setMessage("Your email is verified. Your hospital application is now waiting for an administrator to review it; portal access is not available until approval.");
         return;
@@ -81,7 +82,12 @@ function VerifyEmailForm() {
         setError(result.error ?? "We could not process the resend request.");
         return;
       }
-      setMessage(result.message);
+      const data = result.data;
+      if (data?.smtpConfigured === false) {
+        setError("Email delivery is not configured, so a code cannot be sent yet. Please contact the site administrator. Your email remains unverified.");
+      } else {
+        setMessage(data?.message ?? "If this address is awaiting verification, a new code will be sent when email delivery is available. Check spam or contact support if it does not arrive.");
+      }
       setSeconds(60);
     } catch {
       setError("Network problem — please check your connection and retry.");

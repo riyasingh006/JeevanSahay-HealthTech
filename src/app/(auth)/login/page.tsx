@@ -261,7 +261,9 @@ function LoginForm() {
       setOtpSent(true);
       setOtpCode("");
       setOtpSeconds(60);
-      setOtpNote(result.data?.message ?? "If this address belongs to an eligible account, a sign-in code has been sent.");
+      setOtpNote(result.data?.smtpConfigured === false
+        ? "Email delivery is not configured, so a sign-in code cannot be sent yet. Please contact support."
+        : result.data?.message ?? "If this address belongs to an eligible account, a sign-in code has been sent.");
     } catch {
       setOtpNote("Network problem — please check your connection and retry.");
     } finally {
@@ -306,7 +308,9 @@ function LoginForm() {
         setRecoveryError(result.error ?? "We could not process that request.");
         return;
       }
-      setRecoveryMessage(result.data?.message ?? "If this address belongs to an eligible account, a recovery code has been sent.");
+      setRecoveryMessage(result.data?.smtpConfigured === false
+        ? "Email delivery is not configured, so a recovery code cannot be sent yet. Please contact support."
+        : result.data?.message ?? "If this address belongs to an eligible account, a recovery code has been sent.");
       setRecoveryStep("code");
       setRecoveryCode("");
       setRecoverySeconds(60);
@@ -605,6 +609,20 @@ function LoginForm() {
             Create an account
           </Link>
         </p>
+        <p className="mt-3 text-center text-sm text-[#64748B]">
+          Hospital administrator?{" "}
+          <Link
+            href={`/signup?role=HOSPITAL_ADMIN&next=${encodeURIComponent(next)}`}
+            className="font-bold text-[#2563EB] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#062B67]"
+          >
+            Register your hospital
+          </Link>
+        </p>
+        {role === "admin" && (
+          <p role="note" className="mt-3 text-center text-xs text-[#64748B]">
+            Super-admin accounts are provisioned by the platform; there is no public admin registration.
+          </p>
+        )}
       </div>
 
       {/* ---------------------- static modals ---------------------- */}

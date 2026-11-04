@@ -12,10 +12,12 @@ function smtpConfig() {
   if (!host || !Number.isInteger(port) || port < 1 || port > 65535 || !user || !password || !from) {
     throw new Error("Email delivery is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, and SMTP_FROM.");
   }
+  const secure = process.env.SMTP_SECURE === "true" || port === 465;
   return {
     host,
     port,
-    secure: process.env.SMTP_SECURE === "true" || port === 465,
+    secure,
+    requireTLS: process.env.NODE_ENV === "production" && !secure,
     auth: { user, pass: password },
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,

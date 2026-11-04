@@ -854,14 +854,22 @@ async function main() {
     if (!adminEmail.includes("@") || adminPassword.length < 16 || Buffer.byteLength(adminPassword, "utf8") > 72) {
       throw new Error("Use a valid admin email and a unique password between 16 and 72 bytes.");
     }
-    const existingAdmin = await db.user.findUnique({ where: { email: adminEmail } });
-    if (existingAdmin) {
-      if (existingAdmin.role !== "SUPER_ADMIN") {
-        throw new Error("Refusing to promote an existing non-admin account.");
+    const created = await db.$transaction(async (tx) => {
+      const existingAdmin = await tx.user.findUnique({ where: { email: adminEmail } });
+      if (existingAdmin) {
+        if (existingAdmin.role !== "SUPER_ADMIN") {
+          throw new Error("Refusing to promote an existing non-admin account.");
+        }
+        return false;
       }
-      console.log("The configured super-admin account already exists; it was left unchanged.");
-    } else {
-      await db.user.create({
+      const firstSuperAdmin = await tx.user.findFirst({
+        where: { role: "SUPER_ADMIN" },
+        select: { id: true },
+      });
+      if (firstSuperAdmin) {
+        throw new Error("A super-admin has already been provisioned. Refusing to add another account.");
+      }
+      await tx.user.create({
         data: {
           name: process.env.SEED_SUPER_ADMIN_NAME?.trim() || "Platform Administrator",
           email: adminEmail,
@@ -871,8 +879,11 @@ async function main() {
           emailVerifiedAt: new Date(),
         },
       });
-      console.log("Provisioned the configured super-admin account.");
-    }
+      return true;
+    }, { isolationLevel: "Serializable" });
+    console.log(created
+      ? "Provisioned the first super-admin account."
+      : "The configured super-admin account already exists; it was left unchanged.");
   }
   if (!seedDemoData && !adminEmail) console.log("No seed changes requested.");
 }
