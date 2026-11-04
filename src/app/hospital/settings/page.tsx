@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { Bell, Settings as SettingsIcon } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   PageHeader,
   SectionCard,
 } from "@/components/hospital/hospital-ui";
@@ -15,20 +15,20 @@ import { NativeSelect } from "@/components/hospital/hospital-ui";
 import { useToast } from "@/components/ui/toast";
 
 export default function HospitalSettingsPage() {
-  const { settings, updateSettings, resetDemoData } = useHospitalDemo();
+  const { settings, updateSettings } = useHospitalPortal();
   const { toast } = useToast();
   const [form, setForm] = React.useState(settings);
+  const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => setForm(settings), [settings]);
 
-  function save() {
-    updateSettings(form);
-    toast({ title: "Settings saved", description: "Demo hospital preferences updated.", variant: "success" });
-  }
-
-  function reset() {
-    resetDemoData();
-    toast({ title: "Demo data reset", description: "All hospital demo tables restored to defaults.", variant: "info" });
+  async function save() {
+    setSaving(true);
+    const result = await updateSettings(form);
+    setSaving(false);
+    toast(result.ok
+      ? { title: "Settings saved", description: "Hospital preferences have been saved.", variant: "success" }
+      : { title: "Could not save settings", description: result.error, variant: "error" });
   }
 
   return (
@@ -39,17 +39,15 @@ export default function HospitalSettingsPage() {
         description="Hospital preferences, notification preferences, and dashboard display preferences."
         icon={SettingsIcon}
         actions={
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={reset}>Reset Demo Data</Button>
-            <Button size="sm" onClick={save}>Save Changes</Button>
-          </div>
+          <Button size="sm" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save Changes"}
+          </Button>
         }
       />
 
-      <DemoNotice>
-        Settings are stored locally in the demo store. No real configuration is
-        sent to production systems.
-      </DemoNotice>
+      <LiveRecordsNotice>
+        Email alerts apply to appointment requests and cancellations when SMTP is configured. SMS is not connected; emergency, bed-capacity and daily-summary toggles are stored preferences and do not currently send alerts.
+      </LiveRecordsNotice>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard title="Notification Preferences" description="Alerts and communication">
@@ -78,10 +76,10 @@ export default function HospitalSettingsPage() {
         <SectionCard title="Dashboard Display Preferences" description="UI behavior">
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-              <p className="text-sm text-primary-950">Show Demo Badges</p>
+              <p className="text-sm text-primary-950">Show data-source badges</p>
               <Switch
-                checked={form.display.showDemoBadges}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, display: { ...f.display, showDemoBadges: v } }))}
+                checked={form.display.showLiveBadges}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, display: { ...f.display, showLiveBadges: v } }))}
               />
             </div>
             <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
@@ -146,12 +144,10 @@ export default function HospitalSettingsPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-care-600" aria-hidden />
-              <p className="text-sm font-semibold text-primary-950">Demo Notice</p>
+              <p className="text-sm font-semibold text-primary-950">Notification delivery</p>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              This implementation uses structured local demo data. Resetting
-              returns all hospital portal tables, profile, and settings to their
-              original demo values.
+              Appointment requests and cancellations create in-app alerts. The Email toggle enables those email notices when SMTP is configured. SMS, bed-capacity alerts and daily summaries are not connected to an outbound delivery provider.
             </p>
           </CardContent>
         </Card>

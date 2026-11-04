@@ -34,7 +34,7 @@ function nextDays(n: number) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     out.push({
-      iso: d.toISOString().slice(0, 10),
+      iso: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
       day: i === 0 ? "Today" : i === 1 ? "Tomorrow" : d.toLocaleDateString("en-IN", { weekday: "short" }),
       date: d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
     });
@@ -89,6 +89,9 @@ export function AppointmentDialog({
   const [time, setTime] = React.useState("");
   const [name, setName] = React.useState(user?.name ?? "");
   const [phone, setPhone] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState("");
+  const [appointmentId, setAppointmentId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (open) {
@@ -97,9 +100,47 @@ export function AppointmentDialog({
       setTime("");
       setName(user?.name?.trim() || "");
       setPhone("");
+      setSaving(false);
+      setSubmitError("");
+      setAppointmentId(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, doctor?.id]);
+
+  async function submitRequest(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitError("");
+    if (!doctor) return;
+    if (user?.isDemo) {
+      setSubmitError("Appointment requests are disabled for demo accounts.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          hospitalId: doctor.hospitalId,
+          doctorId: doctor.id,
+          patientName: name,
+          patientPhone: phone,
+          date,
+          time,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error ?? "We could not send your appointment request.");
+      }
+      setAppointmentId(result.data.appointment.id);
+      setStep("done");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Network problem — please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (!doctor) return null;
 
@@ -119,9 +160,9 @@ export function AppointmentDialog({
 
         <p className="flex items-start gap-2 rounded-lg border border-status-info-border bg-status-info-bg px-3 py-2.5 text-xs font-medium text-status-info-fg">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          Appointment booking backend is not connected yet. Slots below are
-          indicative of the doctor&apos;s posted timings and no booking is
-          confirmed until this feature is enabled.
+          {user?.isDemo
+            ? "Demo accounts cannot submit appointment requests. No request will be sent to a hospital."
+            : "This request is saved to your account but does not reserve a slot. Call the hospital to confirm availability before visiting."}
         </p>
 
         {step === "slot" && (
@@ -150,8 +191,7 @@ export function AppointmentDialog({
 
             <fieldset>
               <legend className="data-label mb-2 flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5" aria-hidden /> Available time
-                slots
+                <Clock className="h-3.5 w-3.5" aria-hidden /> Preferred time
               </legend>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {slots.map((s) => (
@@ -171,11 +211,12 @@ export function AppointmentDialog({
                 ))}
               </div>
             </fieldset>
+            <p className="text-xs text-slate-500">Times are suggestions based on posted clinic hours, not live availability. The hospital must confirm your request.</p>
 
             <Button
               size="lg"
               className="w-full"
-              disabled={!time}
+              disabled={!time || user?.isDemo === true}
               onClick={() => setStep("details")}
             >
               Continue
@@ -184,13 +225,7 @@ export function AppointmentDialog({
         )}
 
         {step === "details" && (
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setStep("done");
-            }}
-          >
+          <form className="space-y-4" onSubmit={submitRequest}>
             <div className="space-y-1.5">
               <Label htmlFor="appt-name">Patient name *</Label>
               <Input
@@ -235,12 +270,14 @@ export function AppointmentDialog({
               </p>
             </div>
 
+            {submitError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{submitError}</p>}
+
             <div className="grid gap-2 sm:grid-cols-2">
               <Button type="button" variant="secondary" size="lg" onClick={() => setStep("slot")}>
                 Back
               </Button>
-              <Button type="submit" variant="primary" size="lg">
-                Confirm Appointment Request
+              <Button type="submit" variant="primary" size="lg" loading={saving} disabled={user?.isDemo === true}>
+                Send Appointment Request
               </Button>
             </div>
           </form>
@@ -249,7 +286,7 @@ export function AppointmentDialog({
         {step === "done" && (
           <div className="space-y-4">
             <Badge variant="saffron" size="md">
-              Request saved on this device only — not sent to the hospital
+              Request recorded — confirmation pending
             </Badge>
             <div className="rounded-lg border border-dashed border-slate-300 p-4">
               <p className="text-sm font-semibold text-primary-950">
@@ -261,6 +298,8 @@ export function AppointmentDialog({
               <p className="mt-0.5 text-sm text-slate-600">
                 Patient: {name} · {phone}
               </p>
+              {appointmentId && <p className="mt-2 text-xs text-slate-500">Request reference: {appointmentId}</p>}
+              <p className="mt-2 text-xs text-slate-500">This request is not a confirmed appointment. Contact the hospital to verify availability.</p>
             </div>
             {doctor.hospitalPhone && (
               <a href={`tel:${doctor.hospitalPhone.replace(/\s/g, "")}`}>

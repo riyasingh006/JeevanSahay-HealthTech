@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 import { ok, withApi } from "@/lib/api-helpers";
 
 const schema = z.object({
@@ -56,6 +57,7 @@ export const GET = withApi(
     const params = schema.parse(Object.fromEntries(url.searchParams));
 
     const q = params.q ? collapse(params.q) : "";
+    const session = await getSession();
     const city = params.city ? collapse(params.city) : "";
     const specialty = params.specialty?.trim() ?? "";
     const tokens = nameTokens(q);
@@ -71,6 +73,7 @@ export const GET = withApi(
           : {}),
         hospital: {
           status: "VERIFIED",
+          ...(session?.isDemo ? {} : { isDemo: false }),
           ...(city ? { city: { contains: city } } : {}),
         },
       },
@@ -82,6 +85,7 @@ export const GET = withApi(
             city: true,
             type: true,
             lastAvailabilityUpdate: true,
+            isDemo: true,
           },
         },
       },

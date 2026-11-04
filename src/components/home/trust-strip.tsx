@@ -5,7 +5,7 @@ const TRUST_ICONS = [
   { icon: ShieldCheck, label: "Secure" },
   { icon: FileCheck2, label: "Transparent" },
   { icon: Accessibility, label: "Accessible" },
-  { icon: BadgeCheck, label: "Reliable" },
+  { icon: BadgeCheck, label: "Source-labelled" },
 ];
 
 export function TrustStrip() {
@@ -37,8 +37,7 @@ export function TrustStrip() {
             </div>
           </div>
           <p className="mt-3 max-w-xs text-[12px] leading-[1.6] text-[#52627A]">
-            Digital Health â€“ For All. Verified facilities, real-time
-            availability and AI guidance, built for everyone.
+            Find hospital listings, review facility-reported information, and use AI-assisted navigation with clear limits.
           </p>
           <nav aria-label="Footer" className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-[12px] font-semibold text-[#33415C]">
             <Link href="/hospitals" className="hover:text-[#062B73] hover:underline">Find Hospitals</Link>

@@ -7,26 +7,31 @@ const PATIENT_ROUTES = ["/dashboard", "/profile", "/notifications", "/compare"];
 const HOSPITAL_ADMIN_ROUTES = ["/hospital-portal", "/hospital"];
 const SUPER_ADMIN_ROUTES = ["/admin"];
 
-function secretKey(): Uint8Array {
-  const secret =
-    process.env.SESSION_SECRET ?? "insecure_dev_secret_do_not_use_in_prod";
+function secretKey(): Uint8Array | null {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || new TextEncoder().encode(secret).length < 32) return null;
   return new TextEncoder().encode(secret);
 }
 
 async function readSession(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
-  if (!token) return null;
+  const key = secretKey();
+  if (!token || !key) return null;
   try {
-    const { payload } = await jwtVerify(token, secretKey(), {
+    const { payload } = await jwtVerify(token, key, {
       issuer: "jeevan-sahay",
+      audience: "session",
     });
-    return payload as { sub?: string; role?: string };
+    if (!payload.sub || typeof payload.sid !== "string" || typeof payload.ver !== "number") {
+      return null;
+    }
+    return payload as { sub: string; role?: string; hospitalId?: string; sid: string; ver: number };
   } catch {
     return null;
   }
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const session = await readSession(req);
 
@@ -51,7 +56,8 @@ export async function middleware(req: NextRequest) {
     }
     if (
       HOSPITAL_ADMIN_ROUTES.some((p) => pathname.startsWith(p)) &&
-      !["HOSPITAL_ADMIN", "SUPER_ADMIN"].includes(session.role ?? "")
+      (session.role !== "SUPER_ADMIN" &&
+        (session.role !== "HOSPITAL_ADMIN" || !session.hospitalId))
     ) {
       return NextResponse.redirect(
         new URL("/dashboard?denied=portal", req.url)

@@ -11,7 +11,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { DailyTrendPoint } from "@/lib/hospital/demo-data";
+import type { DailyTrendPoint } from "@/lib/hospital/hospital-data";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 
 export const selectClass =
   "flex h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-ink shadow-sm transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:bg-slate-50";
@@ -23,22 +24,22 @@ export function NativeSelect({
   return <select className={cn(selectClass, className)} {...props} />;
 }
 
-export function DemoDataBadge({ className }: { className?: string }) {
+export function HospitalDataBadge({ className }: { className?: string }) {
+  const { loading, error, settings } = useHospitalPortal();
+  if (!settings.display.showLiveBadges) return null;
+  const label = loading ? "Connecting" : error ? "Data unavailable" : "Hospital records";
+  const tone = error ? "border-rose-200 bg-rose-50 text-rose-700" : loading ? "border-slate-200 bg-slate-50 text-slate-600" : "border-emerald-200 bg-emerald-50 text-emerald-700";
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border border-saffron-200 bg-saffron-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-saffron-700",
-        className
-      )}
-    >
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide", tone, className)}>
       <Info className="h-3 w-3" aria-hidden />
-      Demo Data
+      {label}
     </span>
   );
 }
 
-export function todayDemoLabel(): string {
-  return new Date("2026-10-24T00:00:00").toLocaleDateString("en-IN", {
+export function todayHospitalLabel(): string {
+  return new Date().toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -74,7 +75,7 @@ export function PageHeader({
             </span>
           )}
           <h1 className="institutional-heading text-2xl">{title}</h1>
-          <DemoDataBadge className="hidden sm:inline-flex" />
+          <HospitalDataBadge className="hidden sm:inline-flex" />
         </div>
         {description && (
           <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-600">
@@ -177,8 +178,9 @@ const STATUS_STYLES: Record<
   IN_TREATMENT: { variant: "saffron", label: "In treatment" },
   STABILIZED: { variant: "green", label: "Stabilized" },
   DISCHARGED: { variant: "neutral", label: "Discharged" },
-  SCHEDULED: { variant: "primary", label: "Scheduled" },
-  CHECKED_IN: { variant: "saffron", label: "Checked in" },
+  REQUESTED: { variant: "saffron", label: "Requested" },
+  CONFIRMED: { variant: "primary", label: "Confirmed" },
+  DECLINED: { variant: "red", label: "Declined" },
   COMPLETED: { variant: "green", label: "Completed" },
   CANCELLED: { variant: "red", label: "Cancelled" },
   NO_SHOW: { variant: "neutral", label: "No show" },
@@ -502,12 +504,14 @@ export function SectionCard({
   );
 }
 
-export function DemoNotice({ children }: { children?: React.ReactNode }) {
+export function LiveRecordsNotice({ children }: { children?: React.ReactNode }) {
   return (
     <p className="flex items-start gap-2 rounded-lg border border-care-200 bg-care-50 px-3.5 py-2.5 text-xs leading-relaxed text-care-700">
       <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-      {children ??
-        "This Hospital Portal uses structured local demo data. It is not connected to live hospital systems or real patient records."}
+      <span>
+        This page reads and updates records for your verified hospital. These records are not synchronised with an external hospital information system.
+        {children ? <span className="ml-1">{children}</span> : null}
+      </span>
     </p>
   );
 }

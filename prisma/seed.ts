@@ -36,11 +36,7 @@ interface HospitalSpec {
   lng: number;
   phone: string;
   emergencyPhone: string;
-  accreditation?: string;
   rejectionReason?: string;
-  established: number;
-  about: string;
-  updatedMinutesAgo: number;
   beds: BedSpec[];
   services: [string, string][]; // [key, status]
   doctors: DoctorSpec[];
@@ -59,13 +55,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110001",
     lat: 28.6304,
     lng: 77.2177,
-    phone: "+91 11 4000 1200",
-    emergencyPhone: "+91 11 4000 1299",
-    accreditation: "NABH, NABL",
-    established: 1998,
-    about:
-      "A leading multispeciality tertiary-care hospital in central Delhi with 24×7 emergency, advanced cardiac care and full diagnostic support.",
-    updatedMinutesAgo: 3,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 120, available: 37 },
       { category: "ICU", total: 20, available: 4 },
@@ -106,13 +97,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110017",
     lat: 28.5245,
     lng: 77.2066,
-    phone: "+91 11 4567 8000",
-    emergencyPhone: "+91 11 4567 8099",
-    accreditation: "JCI, NABH",
-    established: 2006,
-    about:
-      "Super-speciality hospital in South Delhi offering neurosciences, cardiac sciences and organ transplant programmes.",
-    updatedMinutesAgo: 12,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 90, available: 12 },
       { category: "ICU", total: 24, available: 1 },
@@ -150,13 +136,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110005",
     lat: 28.6512,
     lng: 77.1907,
-    phone: "+91 11 2890 4500",
-    emergencyPhone: "+91 11 2890 4511",
-    accreditation: "NMC Recognised",
-    established: 1962,
-    about:
-      "Government teaching hospital providing affordable care across all major specialities with subsidised diagnostics.",
-    updatedMinutesAgo: 18,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 240, available: 58 },
       { category: "ICU", total: 30, available: 7 },
@@ -195,13 +176,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110006",
     lat: 28.6506,
     lng: 77.2334,
-    phone: "+91 11 3322 6600",
-    emergencyPhone: "+91 11 3322 6611",
-    accreditation: "NABH Entry Level",
-    established: 1985,
-    about:
-      "Charitable trust hospital delivering low-cost general medicine, dialysis and emergency stabilisation services.",
-    updatedMinutesAgo: 55, // stale on purpose
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 70, available: 22 },
       { category: "ICU", total: 8, available: 2 },
@@ -235,13 +211,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110020",
     lat: 28.5355,
     lng: 77.2713,
-    phone: "+91 11 4711 0000",
-    emergencyPhone: "+91 11 4711 0100",
-    accreditation: "JCI",
-    established: 2010,
-    about:
-      "Dedicated cardiac and pulmonary super-speciality institute with 24×7 cath lab and chest-pain unit.",
-    updatedMinutesAgo: 6,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 80, available: 26 },
       { category: "ICU", total: 28, available: 6 },
@@ -276,13 +247,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110075",
     lat: 28.5921,
     lng: 77.046,
-    phone: "+91 11 4055 7000",
-    emergencyPhone: "+91 11 4055 7077",
-    accreditation: "NABH",
-    established: 2013,
-    about:
-      "Specialist centre for neurology, neurosurgery and spine care with dedicated stroke unit.",
-    updatedMinutesAgo: 25,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 65, available: 18 },
       { category: "ICU", total: 16, available: 5 },
@@ -316,13 +282,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "201309",
     lat: 28.6273,
     lng: 77.3729,
-    phone: "+91 120 478 9000",
-    emergencyPhone: "+91 120 478 9099",
-    accreditation: "NABH",
-    established: 2009,
-    about:
-      "Full-service multispeciality hospital serving Noida with trauma care, mother & child services and modular OTs.",
-    updatedMinutesAgo: 8,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 110, available: 41 },
       { category: "ICU", total: 18, available: 6 },
@@ -362,13 +323,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "201102",
     lat: 28.6733,
     lng: 77.44,
-    phone: "+91 120 267 3300",
-    emergencyPhone: "+91 120 267 3322",
-    accreditation: "State Health Dept.",
-    established: 1978,
-    about:
-      "District-level referral hospital for East Delhi NCR rural belt with infectious disease isolation wing.",
-    updatedMinutesAgo: 1500, // stale — demonstrates outdated warning
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 150, available: 64 },
       { category: "ICU", total: 10, available: 3 },
@@ -403,13 +359,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "122003",
     lat: 28.4595,
     lng: 77.0266,
-    phone: "+91 124 468 0000",
-    emergencyPhone: "+91 124 468 0111",
-    accreditation: "JCI, NABH",
-    established: 2011,
-    about:
-      "Premium medicity with organ-transplant programme, robotic surgery and international patient services.",
-    updatedMinutesAgo: 15,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 130, available: 29 },
       { category: "ICU", total: 32, available: 3 },
@@ -448,13 +399,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "121012",
     lat: 28.4089,
     lng: 77.3178,
-    phone: "+91 129 429 5000",
-    emergencyPhone: "+91 129 429 5050",
-    accreditation: "NABH Entry Level",
-    established: 2002,
-    about:
-      "Integrated care combining ayurveda with modern general medicine, physiotherapy and maternity services.",
-    updatedMinutesAgo: 35,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 60, available: 24 },
       { category: "ICU", total: 6, available: 2 },
@@ -486,13 +432,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110027",
     lat: 28.6435,
     lng: 77.1207,
-    phone: "+91 11 4788 2000",
-    emergencyPhone: "+91 11 4788 2099",
-    accreditation: "NABH",
-    established: 2004,
-    about:
-      "Cardio-pulmonary specialty institute with interventional cardiology, sleep lab and respiratory ICU.",
-    updatedMinutesAgo: 9,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 75, available: 31 },
       { category: "ICU", total: 22, available: 8 },
@@ -526,13 +467,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110085",
     lat: 28.7325,
     lng: 77.11,
-    phone: "+91 11 4705 6000",
-    emergencyPhone: "+91 11 4705 6066",
-    accreditation: "NABH",
-    established: 1996,
-    about:
-      "Mother-and-child focused hospital with NICU level-III, vaccination clinic and paediatric surgery.",
-    updatedMinutesAgo: 20,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 55, available: 19 },
       { category: "ICU", total: 10, available: 4 },
@@ -565,12 +501,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110032",
     lat: 28.6689,
     lng: 77.2869,
-    phone: "+91 11 2278 3400",
-    emergencyPhone: "+91 11 2278 3411",
-    established: 1970,
-    about:
-      "Sub-district government hospital currently completing platform verification formalities.",
-    updatedMinutesAgo: 240,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 100, available: 35 },
       { category: "ICU", total: 8, available: 2 },
@@ -600,12 +532,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110030",
     lat: 28.5184,
     lng: 77.185,
-    phone: "+91 11 2664 1800",
-    emergencyPhone: "+91 11 2664 1811",
-    established: 2015,
-    about:
-      "Polytrauma and orthopaedic emergency centre near the southern ridge area.",
-    updatedMinutesAgo: 300,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 40, available: 14 },
       { category: "ICU", total: 8, available: 3 },
@@ -633,12 +561,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110091",
     lat: 28.605,
     lng: 77.29,
-    phone: "+91 11 2277 4500",
-    emergencyPhone: "+91 11 2277 4501",
-    established: 2020,
-    about:
-      "Wellness-focused facility; registration rejected pending submission of valid NABH documentation.",
-    updatedMinutesAgo: 720,
+    phone: "",
+    emergencyPhone: "",
     rejectionReason:
       "Mandatory registration certificate expired; renewed certificate not yet submitted for review.",
     beds: [
@@ -664,13 +588,8 @@ const hospitals: HospitalSpec[] = [
     pincode: "110070",
     lat: 28.5212,
     lng: 77.158,
-    phone: "+91 11 4609 3000",
-    emergencyPhone: "+91 11 4609 3088",
-    accreditation: "NABH",
-    established: 2012,
-    about:
-      "Comprehensive oncology centre with radiation, chemo-daycare, palliative care and onco-surgery.",
-    updatedMinutesAgo: 14,
+    phone: "",
+    emergencyPhone: "",
     beds: [
       { category: "GENERAL", total: 85, available: 27 },
       { category: "ICU", total: 14, available: 4 },
@@ -698,31 +617,32 @@ const hospitals: HospitalSpec[] = [
 ];
 
 async function main() {
-  console.log("Seeding जीवन Sahay database…");
-
-  await db.auditLog.deleteMany();
-  await db.chatMessage.deleteMany();
-  await db.chatSession.deleteMany();
-  await db.notification.deleteMany();
-  await db.searchRecord.deleteMany();
-  await db.savedHospital.deleteMany();
-  await db.dailyStat.deleteMany();
-  await db.report.deleteMany();
-  await db.doctor.deleteMany();
-  await db.service.deleteMany();
-  await db.bedInventory.deleteMany();
-  await db.hospital.deleteMany();
-  await db.user.deleteMany();
-
-  const passwordHash = await bcrypt.hash("Demo@1234", 12);
+  const seedDemoData = process.env.SEED_DEMO_DATA === "true";
+  if (seedDemoData) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Demo fixtures are disabled in production.");
+    }
+    const [users, hospitalsCount, reports, audits] = await Promise.all([
+      db.user.count(),
+      db.hospital.count(),
+      db.report.count(),
+      db.auditLog.count(),
+    ]);
+    if (users + hospitalsCount + reports + audits > 0) {
+      throw new Error("Demo seeding requires an empty database. No records were changed.");
+    }
+    console.log("Seeding disposable demo data…");
+    const passwordHash = await bcrypt.hash("Demo@1234", 12);
 
   const patient = await db.user.create({
     data: {
       name: "Aarav Sharma",
       email: "patient@demo.in",
       passwordHash,
+      emailVerifiedAt: new Date(),
       role: "PATIENT",
-      phone: "+91 98110 12345",
+      phone: "",
+      isDemo: true,
       age: 34,
       gender: "Male",
       location: "Connaught Place, New Delhi",
@@ -732,7 +652,7 @@ async function main() {
       medications: "Telmisartan 40mg — once daily",
       emergencyName: "Sunita Sharma",
       emergencyRel: "Spouse",
-      emergencyPhone: "+91 98110 54321",
+      emergencyPhone: "",
       sharePin: "482913",
     },
   });
@@ -746,30 +666,24 @@ async function main() {
         name: spec.name,
         type: spec.type,
         status: spec.status,
-        registrationNumber: `DL/HOSP/${spec.established}/${spec.key.toUpperCase()}`,
+        registrationNumber: `DEMO-${spec.key.toUpperCase()}`,
+        isDemo: true,
         addressLine: `${spec.area}`,
         city: spec.city,
         state: "Delhi NCR",
         pincode: spec.pincode,
         phone: spec.phone,
         emergencyPhone: spec.emergencyPhone,
-        email: `care@${spec.key.replace(/-/g, "")}.example.in`,
-        website: `https://${spec.key.replace(/-/g, "")}.example.in`,
         lat: spec.lat,
         lng: spec.lng,
-        about: spec.about,
-        accreditation: spec.accreditation ?? null,
-        established: spec.established,
-        documentsSubmitted: JSON.stringify([
-          "Registration Certificate",
-          "Ownership Proof",
-          "Fire Safety NOC",
-          ...(spec.accreditation ? ["Accreditation Certificate"] : []),
-        ]),
+        about: null,
+        accreditation: null,
+        established: null,
+        documentsSubmitted: "[]",
         rejectionReason: spec.rejectionReason ?? null,
         verifiedAt: spec.status === "VERIFIED" ? ago(60 * 24 * 30) : null,
-        verifiedBy: spec.status === "VERIFIED" ? "super@demo.in" : null,
-        lastAvailabilityUpdate: ago(spec.updatedMinutesAgo),
+        verifiedBy: spec.status === "VERIFIED" ? "seed-fixture" : null,
+        lastAvailabilityUpdate: new Date("2024-01-01T00:00:00.000Z"),
       },
     });
     created[spec.key] = { id: hospital.id, name: hospital.name };
@@ -817,21 +731,14 @@ async function main() {
       name: "Dr. Meera Krishnan",
       email: "hospital@demo.in",
       passwordHash,
+      emailVerifiedAt: new Date(),
       role: "HOSPITAL_ADMIN",
-      phone: "+91 98100 90000",
+      phone: "",
+      isDemo: true,
       hospitalId: created["city"].id,
     },
   });
 
-  await db.user.create({
-    data: {
-      name: "Platform Administrator",
-      email: "super@demo.in",
-      passwordHash,
-      role: "SUPER_ADMIN",
-      phone: "+91 11000 00001",
-    },
-  });
 
   // ---------- Daily stats (last 14 days) ----------
   for (const spec of hospitals.filter((h) => h.status === "VERIFIED")) {
@@ -883,22 +790,22 @@ async function main() {
     data: [
       {
         userId: patient.id,
-        title: "Hospital availability updated",
-        body: "City Multispeciality Hospital updated bed availability 3 minutes ago.",
+        title: "[DEMO] Hospital record updated",
+        body: "Illustrative sample record only. It does not report current bed availability.",
         type: "INFO",
         link: `/hospitals/${created["city"].id}`,
       },
       {
         userId: patient.id,
-        title: "Saved hospital has limited ICU capacity",
-        body: "Apex Institute of Cardiac Sciences is reporting limited ICU availability.",
+        title: "[DEMO] Example inventory notice",
+        body: "Illustrative sample record only. Contact a facility directly to confirm capacity.",
         type: "WARNING",
         link: `/hospitals/${created["apex-cardiac"].id}`,
       },
       {
         userId: patient.id,
-        title: "New specialist availability detected",
-        body: "Dr. Kavita Bansal (Cardiology) has consultation slots open today at City Multispeciality Hospital.",
+        title: "[DEMO] Example specialist notice",
+        body: "Sample specialist information is not a confirmed appointment or current schedule.",
         type: "SUCCESS",
         link: "/doctors?specialty=CARDIOLOGY",
       },
@@ -917,27 +824,57 @@ async function main() {
     data: [
       {
         category: "DATA_ISSUE",
-        subject: "Bed count seems wrong",
-        message:
-          "The general ward availability shown for Sahara Rural Referral Hospital does not match what the helpdesk said on call.",
-        reporterName: "Rohit Malhotra",
-        contactEmail: "rohit.m@example.in",
+        subject: "[DEMO] Example bed-count report",
+        message: "Demonstration-only report. No real patient or facility provided this information.",
+        reporterName: null,
+        contactEmail: null,
         relatedHospital: created["sahara-ghaziabad"].name,
         status: "IN_REVIEW",
       },
       {
         category: "FACILITY",
-        subject: "Ambulance service unavailable despite listing",
-        message: "App shows ambulance available but hospital says service stopped last week.",
-        contactEmail: "neha.k@example.in",
+        subject: "[DEMO] Example service report",
+        message: "Demonstration-only report. No real patient or facility provided this information.",
+        contactEmail: null,
         relatedHospital: created["nirmal"].name,
         status: "OPEN",
       },
     ],
   });
 
-  console.log(`✔ Seeded ${hospitals.length} hospitals, users and demo data.`);
-  console.log("  patient@demo.in | hospital@demo.in | super@demo.in — password: Demo@1234");
+  console.log(`Seeded ${hospitals.length} hospitals and demo data. Demo accounts use the documented development-only password.`);
+  }
+
+  const adminEmail = process.env.SEED_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.SEED_SUPER_ADMIN_PASSWORD;
+  if (Boolean(adminEmail) !== Boolean(adminPassword)) {
+    throw new Error("Set both SEED_SUPER_ADMIN_EMAIL and SEED_SUPER_ADMIN_PASSWORD, or neither.");
+  }
+  if (adminEmail && adminPassword) {
+    if (!adminEmail.includes("@") || adminPassword.length < 16 || Buffer.byteLength(adminPassword, "utf8") > 72) {
+      throw new Error("Use a valid admin email and a unique password between 16 and 72 bytes.");
+    }
+    const existingAdmin = await db.user.findUnique({ where: { email: adminEmail } });
+    if (existingAdmin) {
+      if (existingAdmin.role !== "SUPER_ADMIN") {
+        throw new Error("Refusing to promote an existing non-admin account.");
+      }
+      console.log("The configured super-admin account already exists; it was left unchanged.");
+    } else {
+      await db.user.create({
+        data: {
+          name: process.env.SEED_SUPER_ADMIN_NAME?.trim() || "Platform Administrator",
+          email: adminEmail,
+          passwordHash: await bcrypt.hash(adminPassword, 12),
+          role: "SUPER_ADMIN",
+          status: "ACTIVE",
+          emailVerifiedAt: new Date(),
+        },
+      });
+      console.log("Provisioned the configured super-admin account.");
+    }
+  }
+  if (!seedDemoData && !adminEmail) console.log("No seed changes requested.");
 }
 
 main()

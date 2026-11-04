@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { Building2, Edit2, Save } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   PageHeader,
   SectionCard,
 } from "@/components/hospital/hospital-ui";
@@ -16,17 +16,24 @@ import { Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 
 export default function HospitalProfilePage() {
-  const { profile, departments, services, updateProfile } = useHospitalDemo();
+  const { profile, departments, services, updateProfile } = useHospitalPortal();
   const { toast } = useToast();
   const [editing, setEditing] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   const [form, setForm] = React.useState(profile);
 
   React.useEffect(() => setForm(profile), [profile]);
 
-  function save() {
-    updateProfile(form);
+  async function save() {
+    setSaving(true);
+    const result = await updateProfile(form);
+    setSaving(false);
+    if (!result.ok) {
+      toast({ title: "Could not save profile", description: result.error, variant: "error" });
+      return;
+    }
     setEditing(false);
-    toast({ title: "Profile updated", description: "Demo hospital profile updated.", variant: "success" });
+    toast({ title: "Profile updated", description: "Hospital contact and profile details were saved.", variant: "success" });
   }
 
   return (
@@ -34,13 +41,13 @@ export default function HospitalProfilePage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Hospital Profile"
-        description="View and edit hospital details using demo data."
+        description="View and edit the details stored for this verified hospital."
         icon={Building2}
         actions={
           editing ? (
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" onClick={() => { setForm(profile); setEditing(false); }}>Cancel</Button>
-              <Button size="sm" className="gap-1.5" onClick={save}><Save className="h-3.5 w-3.5" aria-hidden />Save</Button>
+              <Button size="sm" className="gap-1.5" onClick={save} disabled={saving}><Save className="h-3.5 w-3.5" aria-hidden />{saving ? "Saving…" : "Save"}</Button>
             </div>
           ) : (
             <Button size="sm" className="gap-1.5" onClick={() => setEditing(true)}><Edit2 className="h-3.5 w-3.5" aria-hidden />Edit Profile</Button>
@@ -48,10 +55,9 @@ export default function HospitalProfilePage() {
         }
       />
 
-      <DemoNotice>
-        Do not collect or store real sensitive hospital or patient information in
-        this demo implementation.
-      </DemoNotice>
+      <LiveRecordsNotice>
+        Verified hospital name, type, and registration number cannot be changed here. Contact details and descriptive information can be updated by an authorised hospital administrator.
+      </LiveRecordsNotice>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -59,15 +65,15 @@ export default function HospitalProfilePage() {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5 md:col-span-2">
                 <Label htmlFor="hp-name">Hospital Name</Label>
-                <Input id="hp-name" value={form.name} disabled={!editing} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+                <Input id="hp-name" value={form.name} disabled />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="hp-type">Type</Label>
-                <Input id="hp-type" value={form.type} disabled={!editing} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as any }))} />
+                <Input id="hp-type" value={form.type} disabled />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="hp-reg">Registration Number</Label>
-                <Input id="hp-reg" value={form.registrationNumber} disabled={!editing} onChange={(e) => setForm((f) => ({ ...f, registrationNumber: e.target.value }))} />
+                <Input id="hp-reg" value={form.registrationNumber} disabled />
               </div>
               <div className="space-y-1.5 md:col-span-2">
                 <Label htmlFor="hp-addr">Address</Label>

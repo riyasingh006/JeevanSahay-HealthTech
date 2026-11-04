@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
 
 export const GET = withApi(async () => {
-  const session = await requireSession();
+  const session = await requireRole("PATIENT");
   const notifications = await prisma.notification.findMany({
     where: { userId: session.sub },
     orderBy: { createdAt: "desc" },
@@ -18,7 +18,7 @@ export const GET = withApi(async () => {
 
 export const PATCH = withApi(
   async (req) => {
-    const session = await requireSession();
+    const session = await requireRole("PATIENT");
     const schema = z.object({ id: z.string().optional(), all: z.boolean().optional() });
     const parsed = await parseBody(req, schema);
     if (parsed.error) return parsed.error;

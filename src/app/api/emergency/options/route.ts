@@ -3,6 +3,7 @@ import { rankHospitals } from "@/lib/scoring";
 import { loadVerifiedHospitals } from "@/lib/hospital-service";
 import { interpretQuery } from "@/lib/nlp";
 import { ok, parseBody, withApi } from "@/lib/api-helpers";
+import { recordPatientSearch } from "@/lib/patient/search-history";
 
 const schema = z.object({
   condition: z.string().trim().min(2).max(200),
@@ -15,6 +16,7 @@ export const POST = withApi(
     const parsed = await parseBody(req, schema);
     if (parsed.error) return parsed.error;
     const { condition, lat, lng } = parsed.data;
+    await recordPatientSearch(condition, "EMERGENCY");
 
     const need = interpretQuery(condition);
     const hospitals = await loadVerifiedHospitals();
@@ -30,7 +32,7 @@ export const POST = withApi(
 
     const ranked = rankHospitals(capable, {
       specialty: need.specialty,
-      requiresIcu: need.requiresIcu || true,
+      requiresIcu: need.requiresIcu,
       requiresEmergency: true,
       requiresDiagnostics: need.requiresDiagnostics,
       location:

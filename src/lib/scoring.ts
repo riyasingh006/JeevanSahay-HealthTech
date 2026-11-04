@@ -11,7 +11,7 @@
  */
 
 import { RECOMMENDATION_WEIGHTS } from "./constants";
-import { clamp, estimateEtaMinutes, haversineKm, pct } from "./utils";
+import { clamp, estimateEtaMinutes, haversineKm } from "./utils";
 
 export type AvailabilityStatus = "AVAILABLE" | "LIMITED" | "UNAVAILABLE";
 
@@ -21,7 +21,8 @@ export interface HospitalLike {
   lat: number;
   lng: number;
   type: string;
-  status?: string; // verification status
+  status?: string;
+  isDemo?: boolean;
   beds: { category: string; total: number; available: number }[];
   services: { key: string; status: string }[];
   doctors: {
@@ -131,7 +132,7 @@ function scoreBedIcuAvailability(hospital: HospitalLike, need: CareNeed): number
   return clamp(generalScore * 0.65 + icuScore * 0.35, 0, 1);
 }
 
-function scoreEmergencyCapability(hospital: HospitalLike, need: CareNeed): number {
+function scoreEmergencyCapability(hospital: HospitalLike): number {
   const emergencySvc = hospital.services.find((s) => s.key === "EMERGENCY");
   const ambulance = hospital.services.find((s) => s.key === "AMBULANCE");
   const emergencyBeds = hospital.beds.find((b) => b.category === "EMERGENCY");
@@ -172,6 +173,8 @@ export function rankHospitals<T extends HospitalLike>(
   need: CareNeed
 ): ScoredHospital<T>[] {
   const origin = need.location ?? null;
+  const emergencyWeight = need.requiresEmergency ? W.emergencyCapability * 2.5 : W.emergencyCapability;
+  const totalWeight = Object.values(W).reduce((sum, weight) => sum + weight, 0) - W.emergencyCapability + emergencyWeight;
 
   const scored = hospitals.map<ScoredHospital<T>>((hospital) => {
     const distanceKm = origin
@@ -182,7 +185,7 @@ export function rankHospitals<T extends HospitalLike>(
     const medical = scoreMedicalCompatibility(hospital, need);
     const specialists = scoreSpecialistAvailability(hospital, need);
     const beds = scoreBedIcuAvailability(hospital, need);
-    const emergency = scoreEmergencyCapability(hospital, need);
+    const emergency = scoreEmergencyCapability(hospital);
     const distance = origin ? scoreDistanceEta(distanceKm) : 0.6;
     const other = scoreOtherServices(hospital);
 
@@ -199,11 +202,11 @@ export function rankHospitals<T extends HospitalLike>(
       breakdown.medicalCompatibility * W.medicalCompatibility +
       breakdown.specialistAvailability * W.specialistAvailability +
       breakdown.bedIcuAvailability * W.bedIcuAvailability +
-      breakdown.emergencyCapability * W.emergencyCapability +
+      breakdown.emergencyCapability * emergencyWeight +
       breakdown.distanceEta * W.distanceEta +
       breakdown.otherServices * W.otherServices;
 
-    const score = Math.round(clamp(raw, 0, 1) * 100);
+    const score = Math.round(clamp(raw / totalWeight, 0, 1) * 100);
 
     const reasons = buildReasons(hospital, need, breakdown, {
       distanceKm,
@@ -228,19 +231,19 @@ function buildReasons(
     hospital.services.some((s) => s.key === key && statuses.includes(s.status));
 
   if (ctx.matchedSpecialty)
-    reasons.push("Required specialty available with active consultants");
+    reasons.push("Required specialty listed");
   if (need.requiresIcu || b.bedIcuAvailability >= 0.6) {
     const icu = hospital.beds.find((x) => x.category === "ICU");
     if (icu && icu.available > 0)
-      reasons.push(`ICU capacity (${icu.available} available)`);
+      reasons.push(`Facility-reported ICU beds: ${icu.available}`);
   }
-  if (has("EMERGENCY")) reasons.push("Emergency services active");
+  if (has("EMERGENCY")) reasons.push("Emergency services listed");
   if (need.requiresDiagnostics && has("DIAGNOSTICS"))
-    reasons.push("Required diagnostics available");
+    reasons.push("Required diagnostics listed");
   if (has("AMBULANCE") && (need.requiresEmergency || ctx.distanceKm > 12))
-    reasons.push("Ambulance service operational");
-  if (ctx.distanceKm <= 6) reasons.push("Short travel time");
-  else if (b.distanceEta >= 0.4) reasons.push("Reasonable travel time");
+    reasons.push("Ambulance service listed");
+  if (ctx.distanceKm <= 6) reasons.push("Nearby by estimated distance");
+  else if (b.distanceEta >= 0.4) reasons.push("Reasonable estimated distance");
 
   return reasons.slice(0, 5);
 }

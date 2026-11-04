@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DemoDataBadge, DemoFacilityNotice, FacilityReportedNotice } from "@/components/ui/data-source";
 import { useToast } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ import {
 
 interface Rec {
   id: string;
+  isDemo?: boolean;
   name: string;
   score: number;
   distanceKm: number;
@@ -770,10 +772,12 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
             </div>
             {dataSourceLabel && (
               <Badge className="bg-slate-50 text-slate-600 border-slate-200 text-[10px]">
-                {dataSourceLabel === "google-places" ? "Live Google Places" : "Hospital database"}
+                {dataSourceLabel === "google-places" ? "Google Places" : "Hospital database"}
               </Badge>
             )}
           </div>
+          {dataSourceLabel === "internal-db" && <div className="px-4 pt-3"><FacilityReportedNotice /></div>}
+          {allRecs.some((item) => item.isDemo) && <div className="px-4 pt-3"><DemoFacilityNotice /></div>}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {allRecs.length > 0 ? (
               allRecs.map((r, idx) => (
@@ -784,7 +788,7 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
                   transition={{ duration: 0.18, delay: idx * 0.05 }}
                   className="rounded-lg border border-slate-200 p-3 hover:shadow-sm transition-shadow"
                 >
-                  <div className="font-medium text-sm text-slate-900">{r.name}</div>
+                  <div className="flex flex-wrap items-center gap-2"><div className="font-medium text-sm text-slate-900">{r.name}</div>{r.isDemo && <DemoDataBadge />}</div>
                   {r.address && <div className="text-xs text-slate-500 mt-0.5">{r.address}</div>}
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-slate-600">
                     <span>{typeof r.distanceKm === "number" ? `${r.distanceKm} km` : "Distance unavailable"}</span>
@@ -797,7 +801,7 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
                     )}
                     {r.openingStatus && <span>{r.openingStatus}</span>}
                   </div>
-                  {r.phone && (
+                  {!r.isDemo && r.phone && (
                     <div className="flex items-center gap-1 mt-1 text-xs text-slate-600">
                       <PhoneCall className="h-3 w-3" />
                       {r.phone}
@@ -812,14 +816,14 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
                     >
                       View Details
                     </a>
-                    <a
+                    {!r.isDemo && <a
                       href={directionsHref(r)}
                       target="_blank"
                       rel="noreferrer"
                       className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "text-xs h-7")}
                     >
                       Directions
-                    </a>
+                    </a>}
                   </div>
                 </motion.div>
               ))

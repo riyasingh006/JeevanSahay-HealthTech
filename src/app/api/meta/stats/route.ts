@@ -4,13 +4,13 @@ import { ok, withApi } from "@/lib/api-helpers";
 /** Public platform counters for the landing page. */
 export const GET = withApi(async () => {
   const [verifiedHospitals, beds, doctors, users] = await Promise.all([
-    prisma.hospital.count({ where: { status: "VERIFIED" } }),
+    prisma.hospital.count({ where: { status: "VERIFIED", isDemo: false } }),
     prisma.bedInventory.aggregate({
-      where: { hospital: { status: "VERIFIED" } },
+      where: { hospital: { status: "VERIFIED", isDemo: false } },
       _sum: { available: true, total: true },
     }),
-    prisma.doctor.count(),
-    prisma.user.count(),
+    prisma.doctor.count({ where: { hospital: { status: "VERIFIED", isDemo: false } } }),
+    prisma.user.count({ where: { isDemo: false } }),
   ]);
 
   return ok({

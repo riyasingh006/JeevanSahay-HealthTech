@@ -137,7 +137,7 @@ export function SiteHeader() {
             <BrandLockup />
           </Link>
 
-          <nav aria-label="Primary" className="hidden lg:block">
+          <nav aria-label="Primary" className="hidden xl:block">
             <ul className="flex items-center gap-0.5">
               {NAV_ITEMS.map((item) => (
                 <li key={item.href}>
@@ -159,9 +159,9 @@ export function SiteHeader() {
           </nav>
 
           <div className="flex items-center gap-1.5">
-            {user && (
+            {user && user.role !== "SUPER_ADMIN" && (
               <Link
-                href="/notifications"
+                href={user.role === "HOSPITAL_ADMIN" ? "/hospital/notifications" : "/dashboard/notifications"}
                 aria-label={t("util.notifications")}
                 className="relative hidden rounded-lg p-2 text-slate-500 hover:bg-primary-50 hover:text-primary-700 md:block"
               >
@@ -179,7 +179,8 @@ export function SiteHeader() {
 
             {!loading &&
               (user ? (
-                <DropdownMenu>
+                <div className="hidden xl:block">
+                  <DropdownMenu>
                   <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-slate-200 py-1.5 pl-1.5 pr-2.5 text-sm font-medium text-primary-900 shadow-sm transition-colors hover:border-primary-300 hover:bg-primary-50">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-700 text-xs font-bold text-white">
                       {avatarInitial}
@@ -196,13 +197,13 @@ export function SiteHeader() {
                       <LayoutDashboard className="h-4 w-4 text-slate-400" aria-hidden />
                       {t("nav.dashboard")}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push("/profile")}>
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/profile")}>
                       <UserRound className="h-4 w-4 text-slate-400" aria-hidden />
                       Profile & Health Records
                     </DropdownMenuItem>
                     {(user.role === "HOSPITAL_ADMIN" ||
                       user.role === "SUPER_ADMIN") && (
-                      <DropdownMenuItem onClick={() => router.push("/hospital-portal")}>
+                      <DropdownMenuItem onClick={() => router.push("/hospital")}>
                         <Stethoscope className="h-4 w-4 text-slate-400" aria-hidden />
                         Hospital Portal
                       </DropdownMenuItem>
@@ -222,7 +223,8 @@ export function SiteHeader() {
                       {t("nav.logout")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
-                </DropdownMenu>
+                  </DropdownMenu>
+                </div>
               ) : (
                 <div className="hidden items-center gap-2 sm:flex">
                   <Link
@@ -241,7 +243,7 @@ export function SiteHeader() {
               ))}
 
             <button
-              className="rounded-lg p-2 text-slate-600 hover:bg-primary-50 lg:hidden"
+              className="rounded-lg p-2 text-slate-600 hover:bg-primary-50 xl:hidden"
               aria-expanded={mobileOpen}
               aria-controls="mobile-menu"
               aria-label="Open menu"
@@ -258,7 +260,7 @@ export function SiteHeader() {
 
         {/* ---------- Mobile menu ---------- */}
         {mobileOpen && (
-          <div id="mobile-menu" className="border-t border-slate-200 bg-white lg:hidden">
+          <div id="mobile-menu" className="border-t border-slate-200 bg-white xl:hidden">
             <nav aria-label="Mobile" className="container py-3">
               <ul className="divide-y divide-slate-100">
                 {NAV_ITEMS.map((item) => (

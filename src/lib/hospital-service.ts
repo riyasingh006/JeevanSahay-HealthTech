@@ -6,7 +6,9 @@ export interface HospitalFull extends HospitalLike {
   shortName: string | null;
   type: string;
   status: string;
+  isDemo: boolean;
   addressLine: string;
+
   city: string;
   state: string;
   pincode: string;
@@ -27,9 +29,14 @@ export interface HospitalFull extends HospitalLike {
   }[];
 }
 
-export async function loadVerifiedHospitals(): Promise<HospitalFull[]> {
+export async function loadVerifiedHospitals(
+  options: { includeDemo?: boolean } = {}
+): Promise<HospitalFull[]> {
   const rows = await prisma.hospital.findMany({
-    where: { status: "VERIFIED" },
+    where: {
+      status: "VERIFIED",
+      ...(options.includeDemo ? {} : { isDemo: false }),
+    },
     include: {
       beds: true,
       services: true,
@@ -41,7 +48,10 @@ export async function loadVerifiedHospitals(): Promise<HospitalFull[]> {
   return rows as unknown as HospitalFull[];
 }
 
-export async function loadHospitalById(id: string): Promise<HospitalFull | null> {
+export async function loadHospitalById(
+  id: string,
+  options: { includeDemo?: boolean } = {}
+): Promise<HospitalFull | null> {
   const row = await prisma.hospital.findUnique({
     where: { id },
     include: {
@@ -52,5 +62,6 @@ export async function loadHospitalById(id: string): Promise<HospitalFull | null>
       },
     },
   });
+  if (row?.isDemo && !options.includeDemo) return null;
   return (row as unknown as HospitalFull) ?? null;
 }

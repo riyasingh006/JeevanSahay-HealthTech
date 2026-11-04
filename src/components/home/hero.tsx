@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   BedDouble,
   Landmark,
@@ -14,12 +14,12 @@ const TRUST_ITEMS = [
   {
     icon: ShieldCheck,
     tone: "bg-[#EAF7E8] text-[#3AAA35]",
-    lines: ["Verified & Trusted", "Information"],
+    lines: ["Source-labelled", "Listings"],
   },
   {
     icon: BedDouble,
     tone: "bg-[#EAF3FF] text-[#2563EB]",
-    lines: ["Real-time Bed", "Availability"],
+    lines: ["Facility-reported", "Information"],
   },
   {
     icon: Lock,
@@ -29,7 +29,7 @@ const TRUST_ITEMS = [
   {
     icon: Landmark,
     tone: "bg-[#EAF7E8] text-[#2E9429]",
-    lines: ["Public-service", "Platform"],
+    lines: ["Care-navigation", "Tools"],
   },
 ];
 
@@ -78,8 +78,7 @@ export function Hero() {
             </h1>
 
             <p className="mt-3 max-w-[520px] text-[15px] leading-[1.6] text-[#33415C]">
-              Jeevan Sahay आपकी मदद करता है verified hospitals, specialists और
-              real-time bed availability खोजने में — आपके शहर में, आपके लिए।
+              Find hospital and specialist listings near you. Facility-reported availability can be outdated; confirm directly before travelling.
             </p>
 
             {/* CTAs */}

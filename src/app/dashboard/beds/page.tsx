@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { BedDouble, RefreshCcw } from "lucide-react";
-import { Badge, LastUpdated, StatusBadge } from "@/components/ui/badge";
+import { LastUpdated, StatusBadge } from "@/components/ui/badge";
+import { DemoDataBadge, DemoFacilityNotice, FacilityReportedNotice } from "@/components/ui/data-source";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -67,10 +68,9 @@ export default function BedsPage() {
     <div className="mx-auto max-w-6xl">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="institutional-heading text-2xl">Bed Availability</h1>
+          <h1 className="institutional-heading text-2xl">Reported Bed Counts</h1>
           <p className="mt-1 text-sm text-slate-600">
-            General, ICU and emergency beds across the verified network.
-            Manually maintained data — confirm by phone before travelling.
+            Facility-reported general, ICU and emergency bed counts. Confirm directly before travelling.
           </p>
         </div>
         <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => load()}>
@@ -78,12 +78,15 @@ export default function BedsPage() {
         </Button>
       </header>
 
+      <div className="mt-4"><FacilityReportedNotice /></div>
+      {rows.some((row) => row.hospital.isDemo) && <DemoFacilityNotice />}
+
       {/* Summary */}
       <section aria-label="Availability summary" className="mt-4 grid gap-4 sm:grid-cols-3">
         {[
-          { label: "General beds free", value: results ? totals.generalAvail : undefined },
-          { label: "ICU beds free", value: results ? totals.icuAvail : undefined },
-          { label: "Emergency beds free", value: results ? totals.emergencyAvail : undefined },
+          { label: "Reported general beds available", value: results ? totals.generalAvail : undefined },
+          { label: "Reported ICU beds available", value: results ? totals.icuAvail : undefined },
+          { label: "Reported emergency beds available", value: results ? totals.emergencyAvail : undefined },
         ].map(({ label, value }) => (
           <Card key={label} className="border-l-4 border-l-care-600">
             <CardContent className="p-5">
@@ -115,7 +118,7 @@ export default function BedsPage() {
             onChange={(e) => setOnlyAvailable(e.target.checked)}
             className="h-4 w-4 accent-care-600"
           />
-          Only show hospitals with availability
+          Only show hospitals with reported available counts
         </label>
       </div>
 
@@ -164,9 +167,12 @@ export default function BedsPage() {
               {rows.map((r) => (
                 <tr key={r.hospital.id} className="border-b border-slate-100 last:border-0 hover:bg-primary-50/40">
                   <td className="max-w-64 px-4 py-3">
-                    <Link href={`/dashboard/hospitals/${r.hospital.id}`} className="font-medium text-primary-900 hover:underline">
-                      {r.hospital.name}
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/dashboard/hospitals/${r.hospital.id}`} className="font-medium text-primary-900 hover:underline">
+                        {r.hospital.name}
+                      </Link>
+                      {r.hospital.isDemo && <DemoDataBadge />}
+                    </div>
                     <span className="block text-xs text-slate-500">
                       {r.hospital.city}
                     </span>
@@ -195,9 +201,6 @@ export default function BedsPage() {
               ))}
             </tbody>
           </table>
-          <CardContent className="py-3">
-            <Badge variant="neutral" size="sm">Demo Data — sample dataset maintained manually</Badge>
-          </CardContent>
         </Card>
       )}
     </div>

@@ -16,6 +16,7 @@ import {
   Siren,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { DemoDataBadge, DemoFacilityNotice, FacilityReportedNotice } from "@/components/ui/data-source";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -39,6 +40,7 @@ interface DetailResponse {
       type: string;
       status: string;
       addressLine: string;
+      isDemo: boolean;
       city: string;
       state: string;
       pincode: string;
@@ -205,7 +207,7 @@ export default function PortalHospitalDetailPage() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="institutional-heading text-xl md:text-2xl">{h.name}</h1>
-            {h.status === "VERIFIED" && <Badge variant="green" size="md">✓ Verified</Badge>}
+            {h.isDemo ? <DemoDataBadge /> : h.status === "VERIFIED" && <Badge variant="green" size="md">✓ Verified</Badge>}
             {isExternal ? (
               <Badge variant="neutral" size="md">
                 {h.primaryType ?? "Listed on Google"}
@@ -225,9 +227,9 @@ export default function PortalHospitalDetailPage() {
             </div>
             <div className="flex items-center gap-1.5">
               <Phone className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-              <dd>{h.phone ? h.phone : "Phone not available"}</dd>
+              <dd>{h.isDemo ? "Not provided in sample data" : h.phone || "Phone not available"}</dd>
             </div>
-            {h.emergencyPhone && (
+            {!h.isDemo && h.emergencyPhone && (
               <div className="flex items-center gap-1.5 font-medium text-red-700">
                 <Siren className="h-4 w-4 shrink-0" aria-hidden />
                 <dd>
@@ -249,20 +251,20 @@ export default function PortalHospitalDetailPage() {
 
         {/* ---------- Actions ---------- */}
         <div className="flex flex-wrap items-center gap-2">
-          <SaveHospitalButton
+          {!h.isDemo && <SaveHospitalButton
             hospitalId={h.id}
             saved={savedIds.has(h.id)}
             onChange={() => void refreshSaved()}
             size="md"
-          />
+          />}
           <Link href={`/dashboard/compare?ids=${h.id}`}>
             <Button variant="ghost" size="sm" className="gap-1.5">
               <GitCompareArrows className="h-4 w-4" aria-hidden /> Compare
             </Button>
           </Link>
-          <Button variant="subtle" size="sm" className="gap-1.5" onClick={() => setDirectionsOpen(true)}>
+          {!h.isDemo && <Button variant="subtle" size="sm" className="gap-1.5" onClick={() => setDirectionsOpen(true)}>
             <MapPin className="h-4 w-4" aria-hidden /> Get Directions
-          </Button>
+          </Button>}
           {isExternal && h.googleMapsUri && (
             <a href={h.googleMapsUri} target="_blank" rel="noopener noreferrer">
               <Button variant="ghost" size="sm" className="gap-1.5">
@@ -270,25 +272,29 @@ export default function PortalHospitalDetailPage() {
               </Button>
             </a>
           )}
-          {h.phone && (
+          {!h.isDemo && h.phone && (
             <a href={`tel:${h.phone.replace(/\s/g, "")}`}>
               <Button variant="secondary" size="sm" className="gap-1.5">
                 <PhoneCall className="h-4 w-4" aria-hidden /> Call
               </Button>
             </a>
           )}
-          <Button variant="primary" size="sm" className="gap-1.5" onClick={() => setBookingDoctor(booking)}>
+          {!h.isDemo && <Button variant="primary" size="sm" className="gap-1.5" onClick={() => setBookingDoctor(booking)}>
             <CalendarPlus className="h-4 w-4" aria-hidden /> Book Appointment
-          </Button>
+          </Button>}
         </div>
       </header>
 
-      {stale && (
+      {h.isDemo ? (
+        <div className="mt-4"><DemoFacilityNotice /></div>
+      ) : stale ? (
         <p role="alert" className="mt-4 rounded-lg border border-status-unavailable-border bg-status-unavailable-bg px-4 py-2.5 text-sm font-medium text-red-800">
-          ⚠️ Availability information may be outdated — last update{" "}
-          {new Date(h.lastAvailabilityUpdate).toLocaleString("en-IN")}. Please confirm by phone.
+          Availability information may be outdated — last update{" "}
+          {new Date(h.lastAvailabilityUpdate).toLocaleString("en-IN")}. Please confirm directly with the facility.
         </p>
-      )}
+      ) : !isExternal ? (
+        <div className="mt-4"><FacilityReportedNotice /></div>
+      ) : null}
 
       {/* ---------- Details tabs (shared component, props-driven) ---------- */}
       <div className="mt-5">
@@ -314,8 +320,10 @@ export default function PortalHospitalDetailPage() {
 
       <p className="mt-8 border-t border-slate-100 pt-4 text-xs leading-relaxed text-slate-500">
         {isExternal
-          ? "Listing details are provided by Google Places. Availability, bed counts, doctors and services are not available for external listings — confirm by phone before travelling. This page provides navigation support only and is not medical advice."
-          : "Availability is maintained manually by the facility on the Jeevan Sahay sample dataset. Some information may be currently unavailable. This page provides navigation support only and is not medical advice."}
+          ? "This listing is provided by Google Places. Google business status is not a statement about beds, staffing or emergency capacity. Confirm facility details directly. This page provides navigation support only and is not medical advice."
+          : h.isDemo
+            ? "Synthetic demonstration record only. It does not describe a real facility or its location, staffing, services or capacity. Do not use it for care decisions."
+            : "Hospital-entered information may be outdated and is not a live operational feed. Confirm availability and services directly with the facility. This page provides navigation support only and is not medical advice."}
       </p>
 
       <DirectionsDialog

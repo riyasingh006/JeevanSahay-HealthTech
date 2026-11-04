@@ -2,16 +2,15 @@
 
 import * as React from "react";
 import { CalendarClock, Search } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   HospitalStatusBadge,
   NativeSelect,
   PageHeader,
   SectionCard,
   StatCard,
 } from "@/components/hospital/hospital-ui";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -24,20 +23,21 @@ import {
 import { useToast } from "@/components/ui/toast";
 import {
   appointmentStatusCounts,
-  DEMO_DATE,
   todayAppointments,
   type AppointmentStatus,
-} from "@/lib/hospital/demo-data";
+} from "@/lib/hospital/hospital-data";
+import { todayHospitalLabel } from "@/components/hospital/hospital-ui";
 
-const STATUS_OPTS: AppointmentStatus[] = ["SCHEDULED", "CHECKED_IN", "COMPLETED", "CANCELLED", "NO_SHOW"];
+const STATUS_OPTS: AppointmentStatus[] = ["REQUESTED", "CONFIRMED", "DECLINED", "COMPLETED", "CANCELLED", "NO_SHOW"];
 
 export default function HospitalAppointmentsPage() {
-  const { appointments, doctors, departments, updateAppointmentStatus } = useHospitalDemo();
+  const { appointments, updateAppointmentStatus, loading } = useHospitalPortal();
   const { toast } = useToast();
   const [query, setQuery] = React.useState("");
   const [deptFilter, setDeptFilter] = React.useState("all");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState("all");
+  const [updatingId, setUpdatingId] = React.useState<string | null>(null);
 
   const counts = appointmentStatusCounts(appointments);
   const todays = todayAppointments(appointments);
@@ -59,9 +59,13 @@ export default function HospitalAppointmentsPage() {
     });
   }, [appointments, query, deptFilter, statusFilter, dateFilter]);
 
-  function updateStatus(id: string, status: AppointmentStatus) {
-    updateAppointmentStatus(id, status);
-    toast({ title: "Appointment updated", description: "Demo appointment status updated.", variant: "success" });
+  async function updateStatus(id: string, status: AppointmentStatus) {
+    setUpdatingId(id);
+    const result = await updateAppointmentStatus(id, status);
+    setUpdatingId(null);
+    toast(result.ok
+      ? { title: "Appointment updated", description: "The patient has been notified of the status change.", variant: "success" }
+      : { title: "Could not update appointment", description: result.error, variant: "error" });
   }
 
   return (
@@ -69,21 +73,20 @@ export default function HospitalAppointmentsPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Appointments"
-        description="Manage demo appointments with references, doctors, departments, time and status updates."
+        description="Manage current appointment requests with references, doctors, departments, times and status updates."
         icon={CalendarClock}
       />
 
-      <DemoNotice>
-        Uses fictional patient names/references only. Status updates are local
-        demo interactions.
-      </DemoNotice>
+      <LiveRecordsNotice>
+        Patient-submitted appointment requests are stored for this hospital. Contact details are visible only to its authorised staff.
+      </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Total" value={counts.total} hint="All appointments" icon={CalendarClock} tone="blue" />
-        <StatCard label="Today (active)" value={todays.length} hint={`Demo date ${DEMO_DATE}`} icon={CalendarClock} tone="teal" />
-        <StatCard label="Scheduled" value={counts.scheduled} hint="Upcoming" icon={CalendarClock} tone="blue" />
-        <StatCard label="Checked In" value={counts.checkedIn} hint="In queue" icon={CalendarClock} tone="amber" />
-        <StatCard label="Completed / Cancelled" value={counts.completed + counts.cancelled} hint={`${counts.noShow} no show`} icon={CalendarClock} tone="green" />
+        <StatCard label="Today (active)" value={todays.length} hint={todayHospitalLabel()} icon={CalendarClock} tone="teal" />
+        <StatCard label="Requested" value={counts.requested} hint="Awaiting hospital response" icon={CalendarClock} tone="amber" />
+        <StatCard label="Confirmed" value={counts.confirmed} hint="Patient appointments" icon={CalendarClock} tone="blue" />
+        <StatCard label="Completed / Closed" value={counts.completed + counts.declined + counts.cancelled} hint={`${counts.noShow} no show`} icon={CalendarClock} tone="green" />
       </div>
 
       <SectionCard
@@ -137,14 +140,22 @@ export default function HospitalAppointmentsPage() {
                   <TableCell className="text-right">
                     <NativeSelect
                       value={apt.status}
-                      onChange={(ev) => updateStatus(apt.id, ev.target.value as AppointmentStatus)}
+                      disabled={updatingId === apt.id}
+                      onChange={(ev) => void updateStatus(apt.id, ev.target.value as AppointmentStatus)}
                       className="ml-auto h-8 w-36 text-xs"
                     >
-                      {STATUS_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                      {[apt.status, ...(apt.status === "REQUESTED" ? ["CONFIRMED", "DECLINED"] : apt.status === "CONFIRMED" ? ["COMPLETED", "CANCELLED", "NO_SHOW"] : [])].map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}
                     </NativeSelect>
                   </TableCell>
                 </TableRow>
               ))}
+              {!loading && filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-24 text-center text-sm text-slate-500">
+                    {appointments.length === 0 ? "No appointment requests have been received yet." : "No appointments match the current search or filters."}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>

@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { BellRing, ArrowRight } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
-import { DemoNotice, HospitalStatusBadge, PageHeader, SectionCard } from "@/components/hospital/hospital-ui";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
+import { LiveRecordsNotice, HospitalStatusBadge, PageHeader, SectionCard } from "@/components/hospital/hospital-ui";
 import { Button } from "@/components/ui/button";
-import { formatDemoTime } from "@/lib/hospital/demo-data";
+import { formatHospitalTime } from "@/lib/hospital/hospital-data";
 import { cn } from "@/lib/utils";
 
 export default function HospitalNotificationsPage() {
-  const { notifications, markNotificationRead, markAllNotificationsRead } = useHospitalDemo();
+  const { notifications, markNotificationRead, markAllNotificationsRead } = useHospitalPortal();
   const unread = notifications.filter((n) => !n.read).length;
 
   return (
@@ -17,7 +17,7 @@ export default function HospitalNotificationsPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Notifications"
-        description="Demo notifications from the hospital portal activity stream."
+        description="live notifications from the hospital portal activity stream."
         icon={BellRing}
         actions={
           <Button variant="secondary" size="sm" onClick={markAllNotificationsRead} disabled={unread === 0}>
@@ -26,9 +26,9 @@ export default function HospitalNotificationsPage() {
         }
       />
 
-      <DemoNotice>
-        Notifications are generated from demo data and updated in local state.
-      </DemoNotice>
+      <LiveRecordsNotice>
+        In-app notifications are stored with your hospital account and include appointment and record updates.
+      </LiveRecordsNotice>
 
       <SectionCard
         title="Notification Center"
@@ -54,7 +54,7 @@ export default function HospitalNotificationsPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className={cn("text-sm", n.read ? "text-slate-700" : "font-medium text-primary-950")}>{n.title}</p>
-                  <span className="text-xs text-slate-500">{formatDemoTime(n.createdAt)}</span>
+                  <span className="text-xs text-slate-500">{formatHospitalTime(n.createdAt)}</span>
                 </div>
                 <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{n.body}</p>
               </div>

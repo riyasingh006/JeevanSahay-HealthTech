@@ -3,8 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  Ambulance,
-  BedDouble,
   Bookmark,
   BookmarkCheck,
   Car,
@@ -111,8 +109,6 @@ export function HospitalCard({
       });
     }
   };
-
-  const bedStatus = general && general.available > 0 ? "AVAILABLE" : general && general.available > -1 ? "LIMITED" : "UNAVAILABLE";
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-card transition-shadow hover:shadow-raised">

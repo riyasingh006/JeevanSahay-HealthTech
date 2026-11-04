@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { KeyRound, Loader2, Save, ShieldCheck } from "lucide-react";
+import { Copy, KeyRound, Loader2, QrCode, Save, ShieldCheck } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,8 @@ export default function MedicalProfilePage() {
   const [pinCurrent, setPinCurrent] = React.useState("");
   const [pinNew, setPinNew] = React.useState("");
   const [pinBusy, setPinBusy] = React.useState(false);
+  const [shareUrl, setShareUrl] = React.useState<string | null>(null);
+  const [shareBusy, setShareBusy] = React.useState(false);
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -103,6 +106,7 @@ export default function MedicalProfilePage() {
       setProfile((p) => (p ? { ...p, hasSharePin: true } : p));
       setPinCurrent("");
       setPinNew("");
+      setShareUrl(null);
       toast({ title: "Health profile share PIN updated", variant: "success" });
     } catch (err) {
       toast({
@@ -114,6 +118,38 @@ export default function MedicalProfilePage() {
       setPinBusy(false);
     }
   }
+
+  async function generateShareLink() {
+    setShareBusy(true);
+    try {
+      const res = await fetch("/api/user/health-share", {
+        method: "POST",
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error ?? "Could not create a share link");
+      setShareUrl(new URL(json.data.url, window.location.origin).toString());
+    } catch (err) {
+      toast({
+        title: "Could not create a share link",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "error",
+      });
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function copyShareLink() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({ title: "Secure share link copied", variant: "success" });
+    } catch {
+      toast({ title: "Could not copy link", description: "Use the QR code instead.", variant: "error" });
+    }
+  }
+
 
   if (!profile) {
     return (
@@ -229,8 +265,8 @@ export default function MedicalProfilePage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm leading-relaxed text-slate-600">
-            Your medical information stays private to your account and is never
-            sent to third-party services or public pages.
+            Your full medical information stays private. Only the limited emergency
+            summary is shared through a short-lived PIN-protected link that you create.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={profile.hasSharePin ? "green" : "neutral"} size="md">
@@ -251,6 +287,31 @@ export default function MedicalProfilePage() {
               {profile.hasSharePin ? "Rotate PIN" : "Set PIN"}
             </Button>
           </form>
+          <div className="border-t border-slate-100 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Share a limited emergency summary</h3>
+                <p className="mt-1 text-xs text-slate-500">Create a short-lived QR code or link that expires in 5 minutes. The recipient must enter your share PIN.</p>
+              </div>
+              <Button type="button" variant="secondary" disabled={!profile.hasSharePin || shareBusy} onClick={generateShareLink}>
+                {shareBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : <QrCode className="mr-2 h-4 w-4" aria-hidden />}
+                {shareUrl ? "Generate new link" : "Generate secure link"}
+              </Button>
+            </div>
+            {!profile.hasSharePin && <p className="mt-2 text-xs text-amber-700">Set a share PIN above before creating a link.</p>}
+            {shareUrl && (
+              <div className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
+                <QRCodeSVG value={shareUrl} size={176} level="M" includeMargin aria-label="QR code for the limited emergency health summary" />
+                <div className="space-y-2 text-center sm:text-left">
+                  <p className="text-sm font-medium text-slate-800">Scan or copy this secure link</p>
+                  <p className="max-w-md break-all text-xs text-slate-500">The link contains a short-lived access token, not your PIN. Share your PIN separately with the intended recipient.</p>
+                  <Button type="button" size="sm" variant="secondary" onClick={copyShareLink}>
+                    <Copy className="mr-2 h-3.5 w-3.5" aria-hidden /> Copy secure link
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

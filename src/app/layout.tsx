@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     template: "%s | जीवन Sahay",
   },
   description:
-    "सही अस्पताल • सही समय • सही दिशा — Find the right hospital based on your medical requirement, specialist availability, bed/ICU availability, emergency services and travel time.",
+    "सही अस्पताल • सही समय • सही दिशा — Search hospital listings by medical need and distance. Bed, doctor, and service information is facility-reported and should be confirmed with the hospital."
 };
 
 export const viewport: Viewport = {

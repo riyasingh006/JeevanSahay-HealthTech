@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SERVICE_CATALOG } from "@/lib/constants";
+import { DemoFacilityNotice, FacilityReportedNotice } from "@/components/ui/data-source";
 import type { SearchResultItem } from "@/components/patient/hospital-result-card";
 
 type Status = "AVAILABLE" | "LIMITED" | "UNAVAILABLE";
@@ -55,11 +56,11 @@ export default function ServicesPage() {
       <header>
         <h1 className="institutional-heading text-2xl">Healthcare Services</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Services tracked across verified hospitals. Availability is maintained
-          manually by facilities — statuses show live network data where
-          recorded.
+          Services listed by verified hospitals. Status is entered by each facility; confirm directly before travelling.
         </p>
       </header>
+      <div className="mt-4"><FacilityReportedNotice /></div>
+      {results?.some((item) => item.hospital.isDemo) && <DemoFacilityNotice />}
 
       {failed && (
         <div className="mt-6">

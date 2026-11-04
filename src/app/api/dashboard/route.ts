@@ -1,12 +1,29 @@
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { rankHospitals } from "@/lib/scoring";
 import { loadVerifiedHospitals } from "@/lib/hospital-service";
-import { ok, withApi } from "@/lib/api-helpers";
+import { DEFAULT_CENTER } from "@/lib/constants";
+import { fail, ok, withApi } from "@/lib/api-helpers";
+import { z } from "zod";
 
 /** Aggregated patient dashboard payload. */
-export const GET = withApi(async () => {
-  const session = await requireSession();
+const coordinatesSchema = z.object({
+  lat: z.coerce.number().finite().min(-90).max(90),
+  lng: z.coerce.number().finite().min(-180).max(180),
+});
+
+export const GET = withApi(async (req) => {
+  const session = await requireRole("PATIENT");
+  const params = new URL(req.url).searchParams;
+  const lat = params.get("lat");
+  const lng = params.get("lng");
+  let location: { lat: number; lng: number } | undefined;
+  if (lat !== null || lng !== null) {
+    if (!lat?.trim() || !lng?.trim()) return fail(400, "Provide both latitude and longitude.");
+    const parsedLocation = coordinatesSchema.safeParse({ lat, lng });
+    if (!parsedLocation.success) return fail(400, "Location coordinates are invalid.");
+    location = parsedLocation.data;
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.sub },
@@ -15,14 +32,14 @@ export const GET = withApi(async () => {
 
   const [hospitalsRaw, recentSearches, saved, unreadNotifications] =
     await Promise.all([
-      loadVerifiedHospitals(),
+      loadVerifiedHospitals({ includeDemo: session.isDemo === true }),
       prisma.searchRecord.findMany({
         where: { userId: session.sub },
         orderBy: { createdAt: "desc" },
         take: 5,
       }),
       prisma.savedHospital.findMany({
-        where: { userId: session.sub },
+        where: { userId: session.sub, hospital: { is: { status: "VERIFIED", ...(session.isDemo ? {} : { isDemo: false }) } } },
         include: {
           hospital: {
             select: {
@@ -34,6 +51,7 @@ export const GET = withApi(async () => {
               lat: true,
               lng: true,
               lastAvailabilityUpdate: true,
+              isDemo: true,
               beds: { where: { category: { in: ["GENERAL", "ICU"] } } },
             },
           },
@@ -47,7 +65,7 @@ export const GET = withApi(async () => {
 
   const rankedNearby = rankHospitals(hospitalsRaw, {
     requiresEmergency: false,
-    location: undefined, // no geolocation permission assumed — rank by capability
+    location: location ?? DEFAULT_CENTER,
   }).slice(0, 4);
 
   const emergencyFacilities = hospitalsRaw.filter(

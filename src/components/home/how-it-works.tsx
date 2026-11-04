@@ -15,22 +15,22 @@ const STEPS = [
     num: "02",
     icon: BrainCircuit,
     tone: "bg-[#2563EB]",
-    title: "AI Recommends",
-    desc: "Our AI analyses and recommends the best options for you.",
+    title: "Review options",
+    desc: "Compare relevant listings and facility-entered details. AI guidance is not a diagnosis or confirmation of capacity.",
   },
   {
     num: "03",
     icon: MapPin,
     tone: "bg-[#7C6BD6]",
-    title: "Navigate",
-    desc: "Get directions and navigate to the right healthcare facility.",
+    title: "Plan a route",
+    desc: "Open map directions and check the journey with your map provider.",
   },
   {
     num: "04",
     icon: HeartPulse,
     tone: "bg-[#F57C00]",
-    title: "Get Care",
-    desc: "Receive the right care at the right time with confidence.",
+    title: "Confirm with the provider",
+    desc: "Call the facility to confirm services, capacity and appointments before travelling.",
   },
 ];
 

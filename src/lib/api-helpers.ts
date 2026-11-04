@@ -25,7 +25,7 @@ export async function parseBody<T>(
     return { data: schema.parse(raw) };
   } catch (err) {
     if (err instanceof ZodError) {
-      const first = err.errors[0];
+      const first = err.issues[0];
       const path = first?.path?.join(".");
       return {
         error: fail(

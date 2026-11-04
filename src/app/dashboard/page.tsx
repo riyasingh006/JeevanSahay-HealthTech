@@ -75,17 +75,21 @@ export default function PatientDashboardPage() {
   const [patientLoc, setPatientLoc] = React.useState<{
     lat: number;
     lng: number;
+    label: string;
   } | null>(null);
 
   React.useEffect(() => {
-    fetch("/api/dashboard", { cache: "no-store" })
+    const loc = loadPatientLocation();
+    if (loc) setPatientLoc({ lat: loc.lat, lng: loc.lng, label: loc.label });
+    const endpoint = loc
+      ? `/api/dashboard?lat=${encodeURIComponent(loc.lat)}&lng=${encodeURIComponent(loc.lng)}`
+      : "/api/dashboard";
+    fetch(endpoint, { cache: "no-store", headers: { Accept: "application/json" } })
       .then((r) => r.json())
       .then((json) => {
         if (json.ok) setData(json.data as DashboardData);
       })
       .catch(() => {});
-    const loc = loadPatientLocation();
-    if (loc) setPatientLoc({ lat: loc.lat, lng: loc.lng });
   }, []);
 
   const displayName =
@@ -105,22 +109,22 @@ export default function PatientDashboardPage() {
           icon: Building2,
           tone: styles.qaBlue,
           value: String(data.cards.nearbyHospitals),
-          label: "Verified Hospitals",
-          support: "All verified",
+          label: "Hospital Listings",
+          support: "Verified facility profiles",
         },
         {
           icon: BedDouble,
           tone: styles.qaTeal,
           value: String(bedsAvailable),
-          label: "Beds Available Nearby",
-          support: "Many options available",
+          label: "Reported Available Beds",
+          support: "Facility-reported; call to confirm",
         },
         {
           icon: Siren,
           tone: styles.qaRed,
           value: String(data.cards.emergencyFacilities),
-          label: "Emergency Facilities",
-          support: "Active & ready",
+          label: "Facilities with Emergency Services Listed",
+          support: "Call to confirm before travelling",
         },
         {
           icon: Bookmark,
@@ -163,8 +167,8 @@ export default function PatientDashboardPage() {
     },
     {
       href: "/dashboard/beds",
-      title: "Check Bed Availability",
-      desc: "View available beds",
+      title: "View Reported Bed Counts",
+      desc: "Confirm directly with the facility",
       Icon: BedDouble,
       tone: styles.qaPurple,
     },
@@ -173,7 +177,7 @@ export default function PatientDashboardPage() {
   const aiRows = [
     {
       href: "/dashboard/hospitals",
-      title: "Find the best hospital nearby",
+      title: "Compare nearby hospital listings",
       Icon: HeartPulse,
       tone: "#eaf1fe",
       color: "#2563eb",
@@ -214,8 +218,7 @@ export default function PatientDashboardPage() {
               Your health, simplified with intelligent care navigation.
             </p>
             <p className={styles.heroSupport}>
-              Find hospitals, doctors, emergency care and healthcare services
-              around you.
+              Find hospital and doctor listings, facility-reported services, and emergency guidance around you.
             </p>
             <span className={styles.statusPill}>
               <span className={styles.pillDot} aria-hidden />
@@ -338,9 +341,9 @@ export default function PatientDashboardPage() {
                 <p className={styles.panelSub}>Ranked by suitability</p>
                 <p className={styles.locRow}>
                   <MapPin style={{ width: 11, height: 11, color: "#0f9fa8" }} aria-hidden />
-                  {data?.location || patientLoc
-                    ? `Using: ${data?.location || "My current location"}`
-                    : "New Delhi (default centre)"}
+                  {patientLoc
+                    ? `Using: ${patientLoc.label}`
+                    : "New Delhi (default centre; share a location to personalise)"}
                 </p>
               </div>
               <div className={styles.headActions}>
@@ -587,7 +590,7 @@ export default function PatientDashboardPage() {
             <div>
               <p className={styles.emergTitle}>Need Emergency Care?</p>
               <p className={styles.emergSub}>
-                Find the nearest emergency facility instantly.
+                Browse nearby emergency-facility listings; call the facility to confirm capacity.
               </p>
             </div>
           </div>

@@ -63,6 +63,7 @@ type SearchHospital = HospitalLike & {
 
 interface Rec {
   id: string;
+  isDemo?: boolean;
   name: string;
   score: number;
   distanceKm: number;
@@ -257,10 +258,11 @@ async function runSearch(
     };
   }
 
-  // Internal database fallback — real records, honestly labelled.
+  // Internal database fallback — facility records are not live feeds.
   let hospitals: SearchHospital[] = [];
   try {
-    hospitals = await loadVerifiedHospitals();
+    const session = await getSession();
+    hospitals = await loadVerifiedHospitals({ includeDemo: session?.isDemo === true && !need.requiresEmergency });
   } catch (err) {
     console.error("[ai] hospital database unavailable:", err);
   }
@@ -340,7 +342,7 @@ function buildContextNote(args: {
   if (args.searchPerformed && args.search) {
     const s = args.search;
     lines.push(
-      `Live search performed: mode=${s.searchMode}, radius=${s.searchRadiusKm} km, source=${s.dataSource}, results=${s.ranked.length}, fetchedAt=${new Date().toISOString()}.`
+      `Search performed: mode=${s.searchMode}, radius=${s.searchRadiusKm} km, source=${s.dataSource}, results=${s.ranked.length}, fetchedAt=${new Date().toISOString()}.`
     );
     if (s.dataSource === "google-places") {
       lines.push(
@@ -365,7 +367,7 @@ function buildContextNote(args: {
       );
       s.ranked.slice(0, 5).forEach((r, i) => {
         lines.push(
-          `${i + 1}. ${r.hospital.name}${r.hospital.addressLine ? ` — ${r.hospital.addressLine}` : ""} — ${r.distanceKm.toFixed(1)} km away.`
+          `${i + 1}. ${r.hospital.isDemo ? "DEMO SAMPLE — " : "FACILITY-ENTERED RECORD — "}${r.hospital.name}${r.hospital.addressLine ? ` — ${r.hospital.addressLine}` : ""} — ${r.distanceKm.toFixed(1)} km away. Bed, doctor, service and emergency status may be outdated and are not a live feed.`
         );
       });
     } else {
@@ -530,6 +532,7 @@ export const POST = withApi(
     const recommendations: Rec[] = search
       ? search.ranked.slice(0, 3).map((r) => ({
           id: r.hospital.id,
+          isDemo: r.hospital.isDemo,
           name: r.hospital.name,
           score: r.score,
           distanceKm: Math.round(r.distanceKm * 10) / 10,

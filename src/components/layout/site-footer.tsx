@@ -36,7 +36,7 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
     links: [
       { href: "/info/help", label: "Help Center" },
       { href: "/feedback", label: "Feedback & Complaints" },
-      { href: "/hospital-register", label: "Register Your Hospital" },
+      { href: "/signup?role=HOSPITAL_ADMIN", label: "Register Your Hospital" },
     ],
   },
 ];

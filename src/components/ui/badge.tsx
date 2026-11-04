@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { AlertTriangle, CheckCircle2, Clock, Info } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
 import { FRESHNESS_MS } from "@/lib/constants";
 

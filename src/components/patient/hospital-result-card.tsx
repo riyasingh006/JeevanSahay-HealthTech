@@ -14,6 +14,7 @@ import {
 import { Badge, StatusBadge, LastUpdated } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SaveHospitalButton } from "@/components/patient/save-hospital-button";
+import { DemoDataBadge, DemoFacilityNotice, FacilityReportedNotice } from "@/components/ui/data-source";
 
 export type SearchResultItem = {
   hospital: {
@@ -21,6 +22,7 @@ export type SearchResultItem = {
     name: string;
     type: string;
     city: string;
+    isDemo?: boolean;
     addressLine?: string;
     phone: string;
     lat: number;
@@ -111,6 +113,7 @@ export function PortalHospitalCard({
               {h.name}
             </Link>
           </h3>
+          {h.isDemo ? <div className="mt-1"><DemoDataBadge /></div> : !isExternal && <p className="mt-1 text-xs font-medium text-slate-500">Facility-entered information</p>}
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1">
               <MapPin className="h-3.5 w-3.5" aria-hidden />
@@ -133,6 +136,8 @@ export function PortalHospitalCard({
           )}
         </div>
       </div>
+
+      {!isExternal && <div className="mt-3">{h.isDemo ? <DemoFacilityNotice /> : <FacilityReportedNotice />}</div>}
 
       {item.reasons && item.reasons.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Why this facility matches">
@@ -203,7 +208,7 @@ export function PortalHospitalCard({
           <div className="rounded-lg border border-slate-100 bg-paper px-3 py-2">
             <dt className="data-label">General beds</dt>
             <dd className="mt-0.5 text-sm font-semibold tabular-nums text-primary-950">
-              {general ? `${general.available} free` : "Unavailable"}
+              {general ? `${general.available} reported` : "Unavailable"}
               {general && (
                 <span className="ml-1 text-[11px] font-normal text-slate-400">
                   of {general.total}
@@ -214,7 +219,7 @@ export function PortalHospitalCard({
           <div className="rounded-lg border border-slate-100 bg-paper px-3 py-2">
             <dt className="data-label">ICU</dt>
             <dd className="mt-0.5 text-sm font-semibold tabular-nums text-primary-950">
-              {icu ? `${icu.available} free` : "Unavailable"}
+              {icu ? `${icu.available} reported` : "Unavailable"}
             </dd>
           </div>
           <div className="flex items-center rounded-lg border border-slate-100 bg-paper px-3 py-2">
@@ -228,7 +233,7 @@ export function PortalHospitalCard({
                       ? "LIMITED"
                       : "UNAVAILABLE"
                 }
-                label="Emergency"
+                label="Emergency status (reported)"
               />
             </dd>
           </div>
@@ -236,7 +241,7 @@ export function PortalHospitalCard({
             <dt className="data-label">Doctors</dt>
             <dd className="mt-0.5 text-sm font-semibold tabular-nums text-primary-950">
               {doctorsAvailable > 0
-                ? `${doctorsAvailable} available`
+                ? `${doctorsAvailable} listed`
                 : "Information unavailable"}
             </dd>
           </div>
@@ -266,12 +271,11 @@ export function PortalHospitalCard({
               {specialties.length} specialit{specialties.length === 1 ? "y" : "ies"}
             </span>
             <span aria-hidden>·</span>
-            <a
-              href={`tel:${h.phone.replace(/\s/g, "")}`}
-              className="font-medium text-care-700 hover:underline"
-            >
-              <Phone className="mr-0.5 inline h-3 w-3" aria-hidden /> {h.phone}
-            </a>
+            {!h.isDemo && hasPhone && (
+              <a href={`tel:${h.phone.replace(/\s/g, "")}`} className="font-medium text-care-700 hover:underline">
+                <Phone className="mr-0.5 inline h-3 w-3" aria-hidden /> {h.phone}
+              </a>
+            )}
             {h.lastAvailabilityUpdate && (
               <LastUpdated at={h.lastAvailabilityUpdate} />
             )}
@@ -290,21 +294,21 @@ export function PortalHospitalCard({
           />
           Compare
         </label>
-        <SaveHospitalButton
+        {!h.isDemo && <SaveHospitalButton
           hospitalId={h.id}
           saved={saved ?? false}
           onChange={(next) => onToggleSave?.(h.id, next)}
-        />
-        <Button
+        />}
+        {!h.isDemo && <Button
           variant="ghost"
           size="sm"
           onClick={() => onDirections?.(item)}
         >
           <Navigation className="h-4 w-4" aria-hidden /> Directions
-        </Button>
-        <Button variant="subtle" size="sm" onClick={() => onBook?.(item)}>
+        </Button>}
+        {!h.isDemo && <Button variant="subtle" size="sm" onClick={() => onBook?.(item)}>
           <CalendarPlus className="h-4 w-4" aria-hidden /> Book Appointment
-        </Button>
+        </Button>}
         <Link href={`/dashboard/hospitals/${h.id}`}>
           <Button variant="primary" size="sm">View Details</Button>
         </Link>

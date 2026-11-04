@@ -55,7 +55,7 @@ export function BrandLockup({
         {!compact && (
           <span
             className={cn(
-              "mt-1 text-[10px] font-medium uppercase tracking-[0.14em]",
+              "mt-1 hidden text-[10px] font-medium uppercase tracking-[0.14em] sm:block",
               light ? "text-primary-100/80" : "text-slate-500"
             )}
           >

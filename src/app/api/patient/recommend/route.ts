@@ -3,6 +3,8 @@ import { rankHospitals, type ScoredHospital } from "@/lib/scoring";
 import { loadVerifiedHospitals } from "@/lib/hospital-service";
 import { interpretQuery } from "@/lib/nlp";
 import { ok, parseBody, withApi } from "@/lib/api-helpers";
+import { requireRole } from "@/lib/auth";
+import { recordPatientSearch } from "@/lib/patient/search-history";
 import {
   SPECIALTIES,
   SERVICE_CATALOG,
@@ -125,9 +127,11 @@ function intentFromRules(need: string): Omit<AiIntent, "source"> {
 
 export const POST = withApi(
   async (req) => {
+    const session = await requireRole("PATIENT");
     const parsed = await parseBody(req, schema);
     if (parsed.error) return parsed.error;
     const { need, lat, lng } = parsed.data;
+    await recordPatientSearch(need, "AI");
 
     // 1–2. Interpret the need (AI first, deterministic rules as fallback).
     const aiIntent = await extractIntentWithAi(need);
@@ -137,7 +141,7 @@ export const POST = withApi(
 
     // 3. Search nearby hospitals using the EXISTING hospital infrastructure.
     const location = lat != null && lng != null ? { lat, lng } : DEFAULT_CENTER;
-    let candidates = await loadVerifiedHospitals();
+    let candidates = await loadVerifiedHospitals({ includeDemo: session.isDemo === true && intent.urgency !== "EMERGENCY" });
 
     // Proximity gate — mirrors /api/hospitals/search maxDistance ceiling so
     // "near me" stays honest (no results rather than far-away matches).
@@ -158,7 +162,7 @@ export const POST = withApi(
         (h) => h.type === "GOVERNMENT" || h.type === "PSU" || h.type === "TRUST"
       );
       if (candidates.length < 3)
-        candidates = await loadVerifiedHospitals(); // preference is soft — never starve results
+        candidates = await loadVerifiedHospitals({ includeDemo: session.isDemo === true && intent.urgency !== "EMERGENCY" });
     }
 
     const ranked: ScoredHospital<(typeof candidates)[number]>[] = rankHospitals(

@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FacilityReportedNotice } from "@/components/ui/data-source";
 import { AMBULANCE_HELPLINE, EMERGENCY_HELPLINE } from "@/lib/constants";
 import { getCurrentPosition, loadPatientLocation, savePatientLocation, type GeoErrorKind } from "@/lib/patient/location";
 import type { SearchResultItem } from "@/components/patient/hospital-result-card";
@@ -103,11 +104,12 @@ export default function EmergencyPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#B42318]">Emergency Mode</h1>
           <p className="text-sm text-slate-600">
-            Nearest emergency-ready facilities, ranked by distance and
-            capability.
+            Nearby hospital listings with facility-reported emergency services and bed counts. Call to confirm.
           </p>
         </div>
       </header>
+
+      <div className="mt-4"><FacilityReportedNotice /></div>
 
       {/* Helplines */}
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -179,7 +181,7 @@ export default function EmergencyPage() {
         {!failed && options?.length === 0 && (
           <EmptyState
             icon={<Siren className="h-6 w-6" />}
-            title="No emergency-capable facility found nearby."
+            title={origin ? "No matching facility listing found nearby." : "No matching facility listing found."}
             description="Call 112 immediately for assistance."
           />
         )}
@@ -189,7 +191,7 @@ export default function EmergencyPage() {
             <CardContent className="flex flex-wrap items-start justify-between gap-4 p-4">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  {idx === 0 && <Badge variant="red" size="sm">Nearest best option</Badge>}
+                  {idx === 0 && <Badge variant="red" size="sm">Top directory match</Badge>}
                   <h2 className="text-base font-semibold text-primary-950">
                     <Link href={`/dashboard/hospitals/${opt.hospital.id}`} className="hover:underline">
                       {opt.hospital.name}
@@ -212,7 +214,7 @@ export default function EmergencyPage() {
                   )}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <StatusBadge status={"AVAILABLE"} label={`Emergency beds ${opt.hospital.beds.find(b => b.category === "EMERGENCY")?.available ?? 0}`} />
+                  <StatusBadge status={"AVAILABLE"} label={`Reported emergency beds ${opt.hospital.beds.find(b => b.category === "EMERGENCY")?.available ?? 0}`} />
                   <StatusBadge status={(opt.hospital.services.find(s => s.key === "ICU")?.status ?? "UNKNOWN") === "UNKNOWN" ? "LIMITED" : opt.hospital.services.find(s => s.key === "ICU")!.status} label={`ICU ${opt.hospital.beds.find(b => b.category === "ICU")?.available ?? 0}`} />
                   {(opt.hospital.services.find(s => s.key === "AMBULANCE")?.status ?? "UNKNOWN") === "AVAILABLE" && (
                     <Badge variant="neutral" size="sm"><Ambulance className="h-3 w-3" aria-hidden /> Ambulance</Badge>
@@ -246,8 +248,7 @@ export default function EmergencyPage() {
 
       <p className="mt-6 rounded-lg border border-status-unavailable-border bg-status-unavailable-bg px-4 py-3 text-xs leading-relaxed text-red-800">
         In a life-threatening emergency call <strong>112</strong> or{" "}
-        <strong>108</strong> immediately. Bed counts are manually maintained
-        sample data and may be outdated — do not delay care based on this page.
+        <strong>108</strong> immediately. This page does not dispatch care; do not wait for this website to arrange help.
       </p>
     </div>
   );

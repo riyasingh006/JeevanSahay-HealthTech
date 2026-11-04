@@ -2,16 +2,15 @@
 
 import * as React from "react";
 import {
-  ArrowRight,
   BedDouble,
   Filter,
   Plus,
   Search,
   Trash2,
 } from "lucide-react";
-import { useHospitalDemo } from "@/components/hospital/hospital-store";
+import { useHospitalPortal } from "@/components/hospital/hospital-store";
 import {
-  DemoNotice,
+  LiveRecordsNotice,
   HospitalStatusBadge,
   NativeSelect,
   PageHeader,
@@ -19,7 +18,6 @@ import {
   StatCard,
 } from "@/components/hospital/hospital-ui";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,20 +31,19 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import {
-  bedCounts,
-  bedsByType,
-  DEMO_DATE,
-  formatDemoTime,
-  WARD_OPTIONS,
+  bedInventoryCounts,
+  bedInventoryByType,
+  formatHospitalTime,
   type BedStatus,
   type BedType,
-} from "@/lib/hospital/demo-data";
+} from "@/lib/hospital/hospital-data";
 
 const STATUS_OPTIONS: BedStatus[] = ["AVAILABLE", "OCCUPIED", "RESERVED", "MAINTENANCE"];
 
 export default function HospitalBedsPage() {
-  const { beds, addBed, updateBed, removeBed } = useHospitalDemo();
+  const { beds, bedInventory, departments, addBed, updateBed, removeBed, loading, error, refresh } = useHospitalPortal();
   const { toast } = useToast();
+  const [saving, setSaving] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [wardFilter, setWardFilter] = React.useState("all");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -56,11 +53,13 @@ export default function HospitalBedsPage() {
   const [form, setForm] = React.useState<{
     id: string;
     ward: string;
+    bedType: BedType;
+    department: string;
     status: BedStatus;
-  }>({ id: "", ward: WARD_OPTIONS[0]?.ward ?? "", status: "AVAILABLE" });
+  }>({ id: "", ward: "", bedType: "GENERAL", department: "", status: "AVAILABLE" });
 
-  const counts = bedCounts(beds);
-  const byType = bedsByType(beds);
+  const counts = bedInventoryCounts(bedInventory, beds);
+  const byType = bedInventoryByType(bedInventory, beds);
 
   const wards = React.useMemo(
     () => Array.from(new Set(beds.map((b) => b.ward))),
@@ -88,7 +87,7 @@ export default function HospitalBedsPage() {
 
   function openCreate() {
     setEditId(null);
-    setForm({ id: "", ward: WARD_OPTIONS[0]?.ward ?? "", status: "AVAILABLE" });
+    setForm({ id: "", ward: "", bedType: "GENERAL", department: "", status: "AVAILABLE" });
     setOpen(true);
   }
 
@@ -96,23 +95,21 @@ export default function HospitalBedsPage() {
     const bed = beds.find((b) => b.id === bedId);
     if (!bed) return;
     setEditId(bed.id);
-    setForm({ id: bed.id, ward: bed.ward, status: bed.status });
+    setForm({ id: bed.id, ward: bed.ward, bedType: bed.bedType, department: bed.department === "Unassigned" ? "" : bed.department, status: bed.status });
     setOpen(true);
   }
 
-  function submit() {
-    if (editId) {
-      updateBed(editId, { ward: form.ward, status: form.status });
-      toast({ title: "Bed updated", description: `${editId} updated in demo state.`, variant: "success" });
-      setOpen(false);
-      return;
-    }
-    const result = addBed(form);
+  async function submit() {
+    setSaving(true);
+    const result = editId
+      ? await updateBed(editId, { ward: form.ward, bedType: form.bedType, department: form.department, status: form.status })
+      : await addBed(form);
+    setSaving(false);
     if (!result.ok) {
-      toast({ title: "Could not add bed", description: result.error ?? "Invalid input.", variant: "error" });
+      toast({ title: editId ? "Could not update bed" : "Could not add bed", description: result.error, variant: "error" });
       return;
     }
-    toast({ title: "Bed added", description: `${form.id.toUpperCase()} added to demo inventory.`, variant: "success" });
+    toast({ title: editId ? "Bed updated" : "Bed added", description: `${form.id.toUpperCase()} was saved to hospital records.`, variant: "success" });
     setOpen(false);
   }
 
@@ -121,20 +118,27 @@ export default function HospitalBedsPage() {
       <PageHeader
         eyebrow="Hospital Management"
         title="Bed Management"
-        description="Track ward-wise beds, manage status, and maintain a structured demo inventory with validation and feedback."
+        description="Track ward-wise beds, manage status, and maintain a structured live inventory with validation and feedback."
         icon={BedDouble}
         actions={
           <Button size="sm" className="gap-1.5" onClick={openCreate}>
             <Plus className="h-4 w-4" aria-hidden />
-            Add Demo Bed
+            Add bed record
           </Button>
         }
       />
 
-      <DemoNotice>
-        Bed records are demo-only. Changes update UI state locally through the
-        centralized hospital demo store. No real-time hospital data is modified.
-      </DemoNotice>
+      {loading && <p role="status" className="text-sm text-slate-500">Loading hospital records…</p>}
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+          <span>{error}</span>
+          <Button variant="secondary" size="sm" onClick={() => void refresh()}>Retry</Button>
+        </div>
+      )}
+
+      <LiveRecordsNotice>
+        Bed records are stored for this verified hospital. Availability is self-reported here and is not a live feed from hospital equipment or an EHR.
+      </LiveRecordsNotice>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Total Beds" value={counts.total} hint="All categories" icon={BedDouble} tone="blue" />
@@ -168,7 +172,7 @@ export default function HospitalBedsPage() {
 
       <SectionCard
         title="Bed Inventory"
-        description={`Showing ${filtered.length} of ${beds.length} demo beds • Last refresh context ${DEMO_DATE}`}
+        description={`Showing ${filtered.length} of ${beds.length} hospital records`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -216,7 +220,7 @@ export default function HospitalBedsPage() {
                   <TableCell>{bed.bedType}</TableCell>
                   <TableCell className="text-slate-600">{bed.department}</TableCell>
                   <TableCell><HospitalStatusBadge status={bed.status} size="sm" /></TableCell>
-                  <TableCell className="text-xs text-slate-500">{formatDemoTime(bed.updatedAt)}</TableCell>
+                  <TableCell className="text-xs text-slate-500">{formatHospitalTime(bed.updatedAt)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="sm" onClick={() => openEdit(bed.id)}>Edit / Update</Button>
@@ -224,9 +228,11 @@ export default function HospitalBedsPage() {
                         variant="ghost"
                         size="sm"
                         className="text-red-700"
-                        onClick={() => {
-                          removeBed(bed.id);
-                          toast({ title: "Demo bed removed", description: `${bed.id} removed from local demo state.`, variant: "warning" });
+                        onClick={async () => {
+                          const result = await removeBed(bed.id);
+                          toast(result.ok
+                            ? { title: "Bed removed", description: `${bed.id} was removed from hospital records.`, variant: "success" }
+                            : { title: "Could not remove bed", description: result.error, variant: "error" });
                         }}
                       >
                         <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -241,8 +247,8 @@ export default function HospitalBedsPage() {
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
             <Filter className="h-5 w-5 text-slate-400" aria-hidden />
-            <p className="text-sm font-medium text-primary-950">No beds match the filters</p>
-            <p className="text-xs text-slate-500">Adjust search or filters to see demo records.</p>
+            <p className="text-sm font-medium text-primary-950">{beds.length === 0 ? "No bed records yet" : "No beds match the filters"}</p>
+            <p className="text-xs text-slate-500">{beds.length === 0 ? "Add the beds your hospital wants to publish." : "Adjust search or filters to see more records."}</p>
           </div>
         )}
       </SectionCard>
@@ -250,7 +256,7 @@ export default function HospitalBedsPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editId ? "Update Demo Bed" : "Add Demo Bed"}</DialogTitle>
+            <DialogTitle>{editId ? "Update Bed" : "Add Bed"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
@@ -265,16 +271,19 @@ export default function HospitalBedsPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bed-ward">Ward</Label>
-              <NativeSelect
-                id="bed-ward"
-                value={form.ward}
-                onChange={(e) => setForm((f) => ({ ...f, ward: e.target.value }))}
-              >
-                {WARD_OPTIONS.map((w) => (
-                  <option key={w.key} value={w.ward}>
-                    {w.ward} • {w.bedType}
-                  </option>
-                ))}
+              <Input id="bed-ward" value={form.ward} onChange={(e) => setForm((f) => ({ ...f, ward: e.target.value }))} placeholder="e.g. North Wing" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bed-type">Bed Type</Label>
+              <NativeSelect id="bed-type" value={form.bedType} onChange={(e) => setForm((f) => ({ ...f, bedType: e.target.value as BedType }))}>
+                {["GENERAL", "ICU", "EMERGENCY", "PRIVATE", "PEDIATRIC", "MATERNITY", "ISOLATION", "VENTILATOR"].map((type) => <option key={type} value={type}>{type}</option>)}
+              </NativeSelect>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bed-department">Department</Label>
+              <NativeSelect id="bed-department" value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}>
+                <option value="">Unassigned</option>
+                {departments.filter((department) => department.status === "ACTIVE").map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
               </NativeSelect>
             </div>
             <div className="space-y-1.5">
@@ -295,7 +304,7 @@ export default function HospitalBedsPage() {
               <Button variant="secondary" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={submit}>{editId ? "Save Changes" : "Add Bed"}</Button>
+              <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : editId ? "Save Changes" : "Add Bed"}</Button>
             </div>
           </div>
         </DialogContent>
