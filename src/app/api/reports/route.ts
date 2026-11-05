@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
 import { ok, parseBody, withApi } from "@/lib/api-helpers";
 import { isEmailDeliveryConfigured, sendPortalNoticeEmail } from "@/lib/email";
 
@@ -41,7 +42,7 @@ export const POST = withApi(
       }
     } catch (error) {
       emailDelivery = "failed";
-      console.error("[reports] administrator notification failed", error);
+      console.error("[reports] administrator notification failed", safeErrorMetadata(error));
     }
     return ok({ reportId: report.id, emailDelivery }, { status: 201 });
   },

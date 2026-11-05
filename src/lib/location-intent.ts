@@ -185,7 +185,7 @@ export async function resolveExplicitPlace(
       if (alt) return { query, ...alt };
     } catch (err) {
       if (err instanceof GoogleApiError) {
-        console.warn("[location-intent] geocode failed:", err.message);
+        console.warn("[location-intent] geocode failed", { status: err.status });
       } else {
         throw err;
       }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
 import { getClientIp, requireRole, writeAudit } from "@/lib/auth";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
 import { hospitalEmailNotificationsEnabled, notifyHospitalAdmins } from "@/lib/hospital/portal-api";
@@ -127,7 +128,7 @@ export const POST = withApi(
       }
     } catch (error) {
       emailDelivery = "failed";
-      console.error("[appointments] hospital notification fan-out failed", error);
+      console.error("[appointments] hospital notification fan-out failed", safeErrorMetadata(error));
     }
     return ok({ appointment, emailDelivery }, { status: 201 });
   },
@@ -197,7 +198,7 @@ export const PATCH = withApi(
       }
     } catch (error) {
       emailDelivery = "failed";
-      console.error("[appointments] cancellation notification fan-out failed", error);
+      console.error("[appointments] cancellation notification fan-out failed", safeErrorMetadata(error));
     }
     return ok({ cancelled: true, emailDelivery });
   },

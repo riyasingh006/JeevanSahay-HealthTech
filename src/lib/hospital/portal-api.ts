@@ -2,6 +2,8 @@ import "server-only";
 import { AuthError, getClientIp, requireRole, writeAudit } from "@/lib/auth";
 import { withApi } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
+
 
 export type HospitalContext = {
   session: Awaited<ReturnType<typeof requireRole>>;
@@ -87,7 +89,7 @@ export async function hospitalEmailNotificationsEnabled(hospitalId: string): Pro
     const notifications = (value as { notifications?: unknown }).notifications;
     return Boolean(notifications && typeof notifications === "object" && (notifications as { email?: unknown }).email === true);
   } catch (error) {
-    console.error("[hospital-notifications] saved settings could not be read", error);
+    console.error("[hospital-notifications] saved settings could not be read", safeErrorMetadata(error));
     return false;
   }
 }

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
+
 import { withBedInventoryTransaction } from "@/lib/hospital/bed-inventory-transaction";
 import { auditHospitalChange, notifySavedHospitalUsers, withHospitalApi } from "@/lib/hospital/portal-api";
 import { fail, ok, parseBody } from "@/lib/api-helpers";
@@ -56,7 +58,7 @@ export const POST = withHospitalApi(async (req, { hospital, session }) => {
     try {
       await notifySavedHospitalUsers(hospital.id, { title: "Bed availability updated", body: "A hospital you follow has updated its bed records.", link: `/hospitals/${hospital.id}` });
     } catch (error) {
-      console.error("[hospital] saved-hospital notification fan-out failed", error);
+      console.error("[hospital] saved-hospital notification fan-out failed", safeErrorMetadata(error));
     }
     return ok({ bed }, { status: 201 });
   } catch (error) {

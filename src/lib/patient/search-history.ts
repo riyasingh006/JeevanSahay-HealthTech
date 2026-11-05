@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { safeErrorMetadata } from "@/lib/database-errors";
+
 
 type SearchMode = "SEARCH" | "EMERGENCY" | "AI";
 
@@ -13,6 +15,6 @@ export async function recordPatientSearch(query: string, mode: SearchMode): Prom
       data: { userId: session.sub, query: normalizedQuery, mode },
     });
   } catch (error) {
-    console.error("[patient-search] history could not be saved", error instanceof Error ? error.message : "unknown error");
+    console.error("[patient-search] history could not be saved", safeErrorMetadata(error));
   }
 }
