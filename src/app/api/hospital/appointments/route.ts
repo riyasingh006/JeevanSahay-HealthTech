@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
 import { auditHospitalChange, withHospitalApi } from "@/lib/hospital/portal-api";
 import { fail, ok, parseBody } from "@/lib/api-helpers";
 import { isEmailDeliveryConfigured, sendPortalNoticeEmail } from "@/lib/email";
@@ -102,7 +103,7 @@ export const PATCH = withHospitalApi(async (req, context) => {
       emailDelivery = "sent";
     } catch (error) {
       emailDelivery = "failed";
-      console.error("[hospital-appointments] patient email notification failed", error);
+      console.error("[hospital-appointments] patient email notification failed", safeErrorMetadata(error));
     }
   }
   return ok({ updated: true, status: parsed.data.status, emailDelivery });

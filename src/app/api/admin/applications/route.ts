@@ -1,6 +1,7 @@
 import type { Hospital, HospitalApplication } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
 import { getClientIp, requireRole } from "@/lib/auth";
 import { sendHospitalApplicationDecisionEmail } from "@/lib/email";
 import { fail, ok, parseBody, withApi } from "@/lib/api-helpers";
@@ -185,7 +186,7 @@ export const POST = withApi(async (req) => {
     });
     emailSent = true;
   } catch (error) {
-    console.error("[admin] hospital decision email could not be sent", error instanceof Error ? error.message : "unknown error");
+    console.error("[admin] hospital decision email could not be sent", safeErrorMetadata(error));
   }
   return ok({ ...result, emailSent });
 }, { limit: 20, windowMs: 60_000, keyPrefix: "admin-applications" });

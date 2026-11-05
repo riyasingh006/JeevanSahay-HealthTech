@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
+
 import { withBedInventoryTransaction } from "@/lib/hospital/bed-inventory-transaction";
 import { getClientIp, requireRole, writeAudit } from "@/lib/auth";
 import { fail, idFromUrl, ok, parseBody, withApi } from "@/lib/api-helpers";
@@ -148,7 +150,7 @@ export const PATCH = withApi(
         });
       }
     } catch (error) {
-      console.error("[beds] notification fan-out failed", error);
+      console.error("[beds] notification fan-out failed", safeErrorMetadata(error));
     }
 
     return ok({ lastAvailabilityUpdate: updatedHospital.lastAvailabilityUpdate });

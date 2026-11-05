@@ -1,6 +1,8 @@
 ﻿import { randomUUID } from "crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
+
 import { getSession } from "@/lib/auth";
 import { rankHospitals, type ScoredHospital, type HospitalLike } from "@/lib/scoring";
 import { loadVerifiedHospitals } from "@/lib/hospital-service";
@@ -243,7 +245,10 @@ async function runSearch(
         }
       }
     } catch (err) {
-      console.error("[ai] Google Places search failed:", err);
+      console.error("[ai] Google Places search failed", {
+        ...safeErrorMetadata(err),
+        ...(err instanceof GoogleApiError ? { status: err.status } : {}),
+      });
     }
   }
 
@@ -264,7 +269,7 @@ async function runSearch(
     const session = await getSession();
     hospitals = await loadVerifiedHospitals({ includeDemo: session?.isDemo === true && !need.requiresEmergency });
   } catch (err) {
-    console.error("[ai] hospital database unavailable:", err);
+    console.error("[ai] hospital database unavailable", safeErrorMetadata(err));
   }
   let relevant = hospitals;
   if (need.requiresEmergency) {

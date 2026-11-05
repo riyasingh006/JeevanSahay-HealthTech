@@ -1,38 +1,8 @@
 import "server-only";
-import nodemailer from "nodemailer";
+import { sendEmailMessage } from "./email-transport";
+export { isEmailDeliveryConfigured } from "./email-transport";
 
 type OtpPurpose = "EMAIL_VERIFICATION" | "PASSWORD_RESET" | "PASSWORDLESS_LOGIN";
-
-function smtpConfig() {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT);
-  const user = process.env.SMTP_USER;
-  const password = process.env.SMTP_PASSWORD;
-  const from = process.env.SMTP_FROM;
-  if (!host || !Number.isInteger(port) || port < 1 || port > 65535 || !user || !password || !from) {
-    throw new Error("Email delivery is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, and SMTP_FROM.");
-  }
-  const secure = process.env.SMTP_SECURE === "true" || port === 465;
-  return {
-    host,
-    port,
-    secure,
-    requireTLS: process.env.NODE_ENV === "production" && !secure,
-    auth: { user, pass: password },
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  };
-}
-
-export function isEmailDeliveryConfigured(): boolean {
-  try {
-    smtpConfig();
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => {
@@ -63,11 +33,9 @@ export async function sendAuthOtpEmail(input: {
   code: string;
   purpose: OtpPurpose;
 }): Promise<void> {
-  const config = smtpConfig();
   const purpose = purposeText(input.purpose);
   const name = escapeHtml(input.name || "there");
-  await nodemailer.createTransport(config).sendMail({
-    from: process.env.SMTP_FROM,
+  await sendEmailMessage({
     to: input.to,
     subject: purpose.subject,
     text: `Hello ${input.name || "there"},\n\nUse ${input.code} to ${purpose.action}. This code expires in 5 minutes. If you did not request it, you can ignore this email.\n\nJeevan Sahay`,
@@ -82,7 +50,6 @@ export async function sendHospitalApplicationDecisionEmail(input: {
   decision: "VERIFIED" | "REJECTED";
   reason?: string;
 }): Promise<void> {
-  const config = smtpConfig();
   const approved = input.decision === "VERIFIED";
   const recipient = escapeHtml(input.name || "there");
   const hospital = escapeHtml(input.hospitalName);
@@ -96,8 +63,7 @@ export async function sendHospitalApplicationDecisionEmail(input: {
   const body = approved
     ? `<p>Your application for <strong>${hospital}</strong> has been approved.</p><p><a href="${escapeHtml(link)}">Open the Hospital Portal</a></p>`
     : `<p>Your application for <strong>${hospital}</strong> was not approved.</p><p><strong>Reason:</strong> ${reason}</p><p>You may contact support if you believe this decision needs review.</p>`;
-  await nodemailer.createTransport(config).sendMail({
-    from: process.env.SMTP_FROM,
+  await sendEmailMessage({
     to: input.to,
     subject,
     text,
@@ -113,7 +79,6 @@ export async function sendPortalNoticeEmail(input: {
   actionPath?: string;
   actionLabel?: string;
 }): Promise<void> {
-  const config = smtpConfig();
   const name = input.name?.trim() || "there";
   const subject = input.subject.replace(/[\r\n]+/g, " ").slice(0, 180);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL;
@@ -140,8 +105,7 @@ export async function sendPortalNoticeEmail(input: {
   const action = actionUrl && input.actionLabel
     ? `<p><a href="${escapeHtml(actionUrl)}">${escapeHtml(input.actionLabel)}</a></p>`
     : "";
-  await nodemailer.createTransport(config).sendMail({
-    from: process.env.SMTP_FROM,
+  await sendEmailMessage({
     to: input.to,
     subject,
     text,

@@ -1,5 +1,29 @@
 # Jeevan Sahay implementation plan and verification status
 
+## Active production reliability plan (2026-11-05)
+
+**Scope:** Diagnose and fix Neon/Prisma connection handling, email delivery, and Render deployment health checks on `fix/production-database-smtp-deployment`, based on current `origin/main` (`820817ff`). Previous authentication PR #3 is merged. This section supersedes older delivery-status statements below for the production-reliability work only.
+
+**Protected behavior:** Keep Neon PostgreSQL and all existing records; retain migrations, patient/hospital/admin portals, current UI, Google OAuth, OTP expiry/hashing/attempt limits, password reset, resend flow, and role/session checks. Do not use production credentials/database for tests, modify Render production settings, deploy, or merge.
+
+**Verified baseline / plan:**
+
+- The existing `/api/health` route runs `SELECT 1` against Prisma and returns 503 on failure. It is included in Render's configured health-check path and is not intercepted by the auth proxy. Render requires an HTTP health response within five seconds; a sleeping or disconnected Neon connection can therefore make a process-ready instance fail its health check.
+- The Prisma module constructed one client in source but only stored it on `globalThis` outside production; there are no other application `new PrismaClient()` sites beyond test/seed scripts. Prisma 6's default connection lifetime is 300 seconds idle, matching Neon's default five-minute scale-to-zero, and its default connection timeout is five seconds. That makes a stale/closed pooled connection at idle/wake and a too-short first-connect window the most direct source-level cause of the repeated `Closed` errors; the production URL values remain secret and cannot be independently verified here. Reported successful migrations show the direct migration connection worked at that time, not that the current runtime URL is correctly pooled.
+- Email currently uses Nodemailer SMTP. The Blueprint targets Render Free and defaults to port 2525 with STARTTLS, but the configured provider/host is unavailable. Render documents blocks on Free for ports 25/465/587; port 2525 support is provider-specific. Do not claim the provider supports it. Add an HTTPS transactional API option with no new dependency, retain SMTP as a compatible fallback, and test both safely with local/mock transports.
+- A read-only production health request first exceeded a 20-second client timeout; a later request returned HTTP 200 in 1.86 seconds after the service had time to wake. This is consistent with the Free instance's cold-start behavior, but Render deployment logs are not accessible here, so the health-check/database dependency is a concrete deployment risk rather than proof of every past timeout.
+
+| Phase | Work and gate |
+|---|---|
+| 0. Inspect and plan | Complete. Inspect current main, routes/configuration, provider references, tests, environment-variable names, and public health response before editing. |
+| 1. Neon/Prisma resilience | Complete. Use one process-wide client; normalize Neon pooled URLs to TLS, a three-connection cap, 15-second finite connect/pool waits, 240-second idle recycling (before Neon’s five-minute idle), and a 30-second query socket timeout. Remove the legacy PgBouncer compatibility flag for Neon’s current PgBouncer. Classify transient connection failures, reset the pool only after a confirmed closed connection, return a sanitized 503, and never automatically replay database writes. URL, redaction, migration and forced-disconnect recovery tests pass on disposable local PostgreSQL. |
+| 2. Email transport | Complete. Keep bounded SMTP STARTTLS/implicit-TLS with a reused transport; add Resend HTTPS using built-in `fetch` (no new dependency) when `RESEND_API_KEY` is configured. Provider failures expose only a safe code/status; mock API and local SMTP-capture tests pass. Live delivery remains unverified until the owner configures a verified sender and provider credential. |
+| 3. Render health | Complete. Keep `/api/health` as Render’s configured path; it is public and returns HTTP 200 without PostgreSQL, SMTP, OAuth, Maps, or AI calls. Verified by integration test and production server HTTP request with an unavailable local DB URL. The live Render dashboard/deploy logs were not accessible, so the app-side health dependency is fixed but cannot be claimed as the sole cause of each historical timeout. |
+| 4. Full verification and review | In progress. Prisma validation/migration status, ESLint, typecheck, auth/OAuth/scoring, database reconnection, email mock/local SMTP, production build, and local health HTTP have passed. Finish final clean-diff and secret checks before delivery. Production Neon data was not used. |
+| 5. Delivery | Pending final verification. Commit and push only `fix/production-database-smtp-deployment`, create a PR targeting `main`, and do not merge or deploy. The owner must confirm dashboard connection strings and configure the selected email provider. |
+
+
+
 **Updated:** 2026-11-04
 **Working branch:** `feature/jeevan-sahay-final-completion`
 **Status:** Implementation and verification complete; no production deployment or real-user data migration was performed.

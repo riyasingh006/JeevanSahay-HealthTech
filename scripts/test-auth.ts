@@ -210,6 +210,7 @@ async function startApp() {
     GOOGLE_REDIRECT_URI: "http://127.0.0.1:3101/api/auth/google/callback",
     NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3101",
   };
+  delete testEnv.RESEND_API_KEY;
   const portCheck = net.createServer();
   const appPort = await listen(portCheck);
   await new Promise<void>((resolve) => portCheck.close(() => resolve()));
@@ -278,6 +279,10 @@ async function main() {
   };
   run("npx", ["prisma", "generate"], setupEnv);
   await startApp();
+  const healthResponse = await fetch(`${baseUrl}/api/health`, { headers: { Accept: "application/json" } });
+  assert.equal(healthResponse.status, 200);
+  assert.deepEqual(await healthResponse.json(), { status: "ok" });
+  console.log("PASS public process-health endpoint returns 200");
   const { PrismaClient } = await import("@prisma/client");
   prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 

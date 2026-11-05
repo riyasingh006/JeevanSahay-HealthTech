@@ -1,4 +1,6 @@
 import { Prisma } from "@prisma/client";
+import { safeErrorMetadata } from "@/lib/database-errors";
+
 import { z } from "zod";
 import { withBedInventoryTransaction } from "@/lib/hospital/bed-inventory-transaction";
 import {
@@ -115,7 +117,7 @@ export const PATCH = withHospitalApi(async (req, { hospital, session }) => {
   try {
     await notifySavedHospitalUsers(hospital.id, { title: "Bed availability updated", body: "A hospital you follow has updated its bed records.", link: `/hospitals/${hospital.id}` });
   } catch (error) {
-    console.error("[hospital] saved-hospital notification fan-out failed", error);
+    console.error("[hospital] saved-hospital notification fan-out failed", safeErrorMetadata(error));
   }
   return ok({ bed: updated });
 }, { limit: 60, windowMs: 60_000, keyPrefix: "hospital-bed-update" });
@@ -159,7 +161,7 @@ export const DELETE = withHospitalApi(async (req, { hospital, session }) => {
   try {
     await notifySavedHospitalUsers(hospital.id, { title: "Bed availability updated", body: "A hospital you follow has updated its bed records.", link: `/hospitals/${hospital.id}` });
   } catch (error) {
-    console.error("[hospital] saved-hospital notification fan-out failed", error);
+    console.error("[hospital] saved-hospital notification fan-out failed", safeErrorMetadata(error));
   }
   return ok({ deleted: true });
 }, { limit: 30, windowMs: 60_000, keyPrefix: "hospital-bed-delete" });

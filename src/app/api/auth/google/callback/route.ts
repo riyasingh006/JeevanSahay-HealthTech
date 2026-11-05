@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
+import { safeErrorMetadata } from "@/lib/database-errors";
+
 import {
   constantTimeEqual,
   getClientIp,
@@ -253,7 +255,7 @@ export async function GET(req: NextRequest) {
     if (error instanceof Error && ["account_suspended", "account_inactive", "google_account_link_conflict"].includes(error.message)) {
       return redirectError(baseUrl, error.message);
     }
-    console.error("[auth] Google OAuth callback failed", error instanceof Error ? error.message : "unknown error");
+    console.error("[auth] Google OAuth callback failed", safeErrorMetadata(error));
     return redirectError(baseUrl, "google_failed");
   }
 }

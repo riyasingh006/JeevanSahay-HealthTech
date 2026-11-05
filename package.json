@@ -12,6 +12,8 @@
     "test:auth": "tsx scripts/test-auth.ts",
     "test:oauth": "tsx scripts/test-google-oauth-url.ts",
     "test:scoring": "tsx scripts/test-scoring.ts",
+    "test:database": "tsx scripts/test-database-resilience.ts",
+    "test:email": "tsx scripts/test-email-transport.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate:dev": "prisma migrate dev",

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { ZodError, type ZodSchema } from "zod";
 import { AuthError } from "./auth";
 import { check } from "./rate-limit";
+import { isTransientDatabaseError, safeErrorMetadata, shouldResetPrismaConnection } from "./database-errors";
+import { resetPrismaConnection } from "./prisma";
 
 export function ok<T>(data: T, init?: ResponseInit) {
   return NextResponse.json({ ok: true, data }, init);
@@ -81,7 +83,16 @@ export function withApi(
       return await handler(req);
     } catch (err) {
       if (err instanceof AuthError) return fail(err.status, err.message);
-      console.error("[api] unhandled error:", err);
+      if (isTransientDatabaseError(err)) {
+        console.error("[api] transient database failure", safeErrorMetadata(err));
+        if (shouldResetPrismaConnection(err)) await resetPrismaConnection();
+
+        return NextResponse.json(
+          { ok: false, error: "A temporary service problem occurred. Please try again shortly." },
+          { status: 503 }
+        );
+      }
+      console.error("[api] unhandled error", safeErrorMetadata(err));
       return fail(500, "Something went wrong on our side. Please try again.");
     }
   };

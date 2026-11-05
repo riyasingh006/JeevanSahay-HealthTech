@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies, headers } from "next/headers";
 import { prisma } from "./prisma";
+import { safeErrorMetadata } from "./database-errors";
+
 
 export type Role = "PATIENT" | "HOSPITAL_ADMIN" | "SUPER_ADMIN";
 
@@ -324,7 +326,7 @@ export async function writeAudit(entry: {
       },
     });
   } catch (error) {
-    console.error("[audit] failed to persist audit log", error);
+    console.error("[audit] failed to persist audit log", safeErrorMetadata(error));
   }
 }
 
