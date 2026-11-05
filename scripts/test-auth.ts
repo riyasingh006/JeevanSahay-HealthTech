@@ -283,6 +283,19 @@ async function main() {
   assert.equal(healthResponse.status, 200);
   assert.deepEqual(await healthResponse.json(), { status: "ok" });
   console.log("PASS public process-health endpoint returns 200");
+  const landingPage = await fetch(`${baseUrl}/`);
+  assert.equal(landingPage.status, 200);
+  const landingHtml = await landingPage.text();
+  const hospitalCtaIndex = landingHtml.indexOf("Find Hospitals Near You");
+  assert.notEqual(hospitalCtaIndex, -1);
+  const hospitalCtaStart = landingHtml.lastIndexOf("<a", hospitalCtaIndex);
+  const hospitalCtaEnd = landingHtml.indexOf("</a>", hospitalCtaIndex);
+  assert.ok(hospitalCtaStart >= 0 && hospitalCtaEnd > hospitalCtaStart);
+  assert.ok(landingHtml.slice(hospitalCtaStart, hospitalCtaEnd + 4).includes('href="/login"'));
+  const retiredHospitalsPage = await fetch(`${baseUrl}/hospitals`, { redirect: "manual" });
+  assert.ok([307, 308].includes(retiredHospitalsPage.status));
+  assert.equal(new URL(retiredHospitalsPage.headers.get("location")!, baseUrl).pathname, "/login");
+  console.log("PASS landing hospital CTA goes directly to sign-in and /hospitals redirects without rendering the directory");
   const { PrismaClient } = await import("@prisma/client");
   prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 
