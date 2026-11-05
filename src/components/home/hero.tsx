@@ -84,7 +84,7 @@ export function Hero() {
             {/* CTAs */}
             <div className="mt-9 flex flex-wrap items-center gap-x-10 gap-y-3.5 sm:flex-row">
               <Link
-                href="/hospitals"
+                href="/login"
                 className="inline-flex h-[44px] min-w-[255px] items-center justify-center gap-2 rounded-md bg-[#062B73] px-5 text-[13.5px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(6,43,115,0.55)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#0B3D91] hover:shadow-lg"
               >
                 <Stethoscope className="h-4 w-4" aria-hidden />
