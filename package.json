@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "test:auth": "tsx scripts/test-auth.ts",
+    "test:gemini": "tsx scripts/test-gemini-reliability.ts",
     "test:oauth": "tsx scripts/test-google-oauth-url.ts",
     "test:scoring": "tsx scripts/test-scoring.ts",
     "test:database": "tsx scripts/test-database-resilience.ts",
@@ -22,7 +23,7 @@
     "db:seed": "prisma db seed"
   },
   "dependencies": {
-    "@google/genai": "^2.30.0",
+    "@google/genai": "^2.32.0",
     "@prisma/client": "^6.3.0",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",

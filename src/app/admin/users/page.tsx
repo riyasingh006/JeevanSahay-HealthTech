@@ -90,15 +90,15 @@ export default function AdminUsersPage() {
       {resource.error && <AdminError message={resource.error} retry={() => void resource.refresh()} />}
       <Card>
         <CardHeader><CardTitle>Account directory</CardTitle><CardDescription>{resource.data ? `${resource.data.total} accounts match these filters.` : "Account records are loaded from the protected database."}</CardDescription></CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={applyFilters} className="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_180px_190px_auto]">
+        <CardContent className="min-w-0 space-y-4">
+          <form onSubmit={applyFilters} className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_180px_190px_auto]">
             <label className="relative"><span className="sr-only">Search accounts</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden /><Input className="pl-9" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Name, email, or phone" /></label>
             <label className="sr-only" htmlFor="account-role">Role</label><select id="account-role" value={role} onChange={(event) => { setRole(event.target.value); setPage(1); }} className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800"><option value="">All roles</option>{roles.filter(Boolean).map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select>
             <label className="sr-only" htmlFor="account-status">Status</label><select id="account-status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800"><option value="">All account statuses</option>{statuses.filter(Boolean).map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select>
             <Button type="submit">Apply filters</Button>
           </form>
           {resource.loading && !resource.data ? <p role="status" className="py-8 text-center text-sm text-slate-500">Loading accounts…</p> : accounts.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 px-4 py-12 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-400" aria-hidden /><p className="mt-3 font-medium text-primary-950">No matching accounts</p><p className="mt-1 text-sm text-slate-500">Change the filters or clear the search to see more accounts.</p></div> : <>
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <div className="min-w-0 max-w-full overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full min-w-[850px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 font-semibold">Account</th><th className="px-4 py-3 font-semibold">Role</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Hospital</th><th className="px-4 py-3 font-semibold">Joined</th><th className="px-4 py-3 font-semibold">Action</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">

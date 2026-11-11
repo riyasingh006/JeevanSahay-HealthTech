@@ -30,6 +30,16 @@ import {
   savePatientLocation,
   type GeoErrorKind,
 } from "@/lib/patient/location";
+import {
+  assistantHistoryPayload,
+  assistantMessageText,
+  assistantSseData,
+  ensureAssistantStreamCompleted,
+  isAssistantAbortError,
+  settleAssistantRequestError,
+  splitAssistantSseEvents,
+  type AssistantConversationMessage,
+} from "@/lib/ai-assistant-state";
 
 interface Rec {
   id: string;
@@ -51,9 +61,7 @@ interface Rec {
   lng?: number;
 }
 
-interface Msg {
-  role: "user" | "assistant";
-  content: string;
+interface Msg extends AssistantConversationMessage {
   recommendations?: Rec[];
   urgency?: string;
   timestamp?: string;
@@ -305,10 +313,7 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
     setLastError(null);
     setLastSent(message);
 
-    const historyPayload = messages
-      .filter((m) => m.role && m.content.trim().length > 0)
-      .slice(-10)
-      .map((m) => ({ role: m.role, content: m.content }));
+    const historyPayload = assistantHistoryPayload(messages);
     const assistantIdx = messages.length + 1;
 
     setMessages((m) => [
@@ -320,6 +325,9 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
 
     const controller = new AbortController();
     abortRef.current = controller;
+
+    let streamExpected = false;
+    let streamCompleted = false;
 
     try {
       const res = await fetch("/api/ai/chat", {
@@ -342,7 +350,8 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
       }
 
       const contentType = res.headers.get("content-type") ?? "";
-      if (!contentType.includes("text/event-stream")) {
+      streamExpected = contentType.includes("text/event-stream");
+      if (!streamExpected) {
         const json = await res.json();
         if (!json.ok) throw new Error(json.error ?? "AI unavailable");
         if (json.data?.sessionId) setSessionId(json.data.sessionId);
@@ -359,43 +368,53 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
       if (!reader) throw new Error("Streaming not supported by this browser.");
       const decoder = new TextDecoder();
       let buffer = "";
+      const applyEvent = (event: string) => {
+        if (controller.signal.aborted || streamCompleted) return;
+        const data = assistantSseData(event);
+        if (!data) return;
+        let payload: any;
+        try {
+          payload = JSON.parse(data);
+        } catch {
+          return;
+        }
+        if (payload?.type === "meta") {
+          if (payload.sessionId) setSessionId(payload.sessionId);
+          if (payload.aiStatus) setAiStatus(payload.aiStatus);
+          patchMsg(assistantIdx, {
+            urgency: payload.urgency,
+            recommendations: payload.recommendations?.length
+              ? payload.recommendations
+              : undefined,
+          });
+        } else if (payload?.type === "delta" && typeof payload.text === "string") {
+          patchMsg(assistantIdx, (prev) => ({ content: prev.content + payload.text }));
+        } else if (payload?.type === "replace" && typeof payload.text === "string") {
+          patchMsg(assistantIdx, { content: payload.text });
+        } else if (payload?.type === "done") {
+          streamCompleted = true;
+          if (payload.aiStatus) setAiStatus(payload.aiStatus);
+          if (typeof payload.reply === "string" && payload.reply.length > 0) {
+            patchMsg(assistantIdx, { content: payload.reply });
+          }
+        } else if (payload?.type === "error") {
+          throw new Error(payload.message ?? "AI unavailable");
+        }
+      };
 
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split("\n\n");
-        buffer = events.pop() ?? "";
-        for (const event of events) {
-          const line = event.split("\n").find((l) => l.startsWith("data:"));
-          if (!line) continue;
-          let payload: any;
-          try {
-            payload = JSON.parse(line.slice(5));
-          } catch {
-            continue;
-          }
-          if (payload?.type === "meta") {
-            if (payload.sessionId) setSessionId(payload.sessionId);
-            if (payload.aiStatus) setAiStatus(payload.aiStatus);
-            patchMsg(assistantIdx, {
-              urgency: payload.urgency,
-              recommendations: payload.recommendations?.length
-                ? payload.recommendations
-                : undefined,
-            });
-          } else if (payload?.type === "delta" && typeof payload.text === "string") {
-            patchMsg(assistantIdx, (prev) => ({ content: prev.content + payload.text }));
-          } else if (payload?.type === "done") {
-            if (payload.aiStatus) setAiStatus(payload.aiStatus);
-            if (typeof payload.reply === "string" && payload.reply.length > 0) {
-              patchMsg(assistantIdx, { content: payload.reply });
-            }
-          } else if (payload?.type === "error") {
-            throw new Error(payload.message ?? "AI unavailable");
-          }
-        }
+        const parsed = splitAssistantSseEvents(buffer);
+        buffer = parsed.remainder;
+        for (const event of parsed.events) applyEvent(event);
       }
+      buffer += decoder.decode();
+      const finalEvents = splitAssistantSseEvents(buffer, true);
+      buffer = finalEvents.remainder;
+      for (const event of finalEvents.events) applyEvent(event);
+      ensureAssistantStreamCompleted(streamCompleted, controller.signal.aborted);
 
       setMessages((m) =>
         m.map((msg, i) =>
@@ -403,16 +422,17 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
         )
       );
     } catch (e) {
-      if ((e as { name?: string })?.name === "AbortError") {
-        setMessages((m) =>
-          m.map((msg, i) =>
-            i === assistantIdx && !msg.content.trim() ? { ...msg, content: "(Stopped.)" } : msg
-          )
-        );
-      } else {
+      const aborted = isAssistantAbortError(e);
+      setMessages((m) =>
+        settleAssistantRequestError(m, assistantIdx, {
+          aborted,
+          streamExpected,
+          streamCompleted,
+        })
+      );
+      if (!aborted) {
         const msg = e instanceof Error ? e.message : "Please try again shortly.";
         setLastError(msg);
-        setMessages((m) => m.filter((_, i) => i !== assistantIdx || m[i].content.trim().length > 0));
         toast({ title: "Jeevan AI is unavailable", description: msg, variant: "error" as any });
       }
     } finally {
@@ -526,7 +546,7 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
           {aiStatus === "quota" && (
             <Badge
               className="w-fit bg-amber-50 text-amber-700 border-amber-200"
-              title="The Gemini API free-tier quota for this key is exhausted. Wait for it to reset and try again. Hospital search still works."
+              title="The Gemini API quota or rate limit has been reached. Check the configured project's quota and billing, or try again later. Hospital search still works."
             >
               AI quota exhausted
             </Badge>
@@ -537,7 +557,7 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col sm:flex-row sm:items-center gap-2">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 text-sm text-slate-600 flex-1 min-w-0">
           <MapPin className="h-4 w-4 shrink-0 text-teal-600" />
           <span className="truncate">
@@ -550,7 +570,7 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
             )}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
           <Button size="sm" variant="subtle" onClick={locateMe} disabled={locBusy}>
             <MapPin className="h-4 w-4 mr-1" />
             {locBusy ? "Detecting..." : "Use My Current Location"}
@@ -559,7 +579,7 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
             value={locQuery}
             onChange={(e) => setLocQuery(e.target.value)}
             placeholder="City, area, PIN code, or address"
-            className="h-9 w-44"
+            className="h-9 w-44 max-w-full min-w-0"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -622,7 +642,7 @@ export function AiAssistantClient({ embedded = false }: { embedded?: boolean } =
                           Urgent
                         </div>
                       )}
-                      {m.content}
+                      {assistantMessageText(m)}
                     </div>
                     <div
                       className={`flex items-center gap-2 text-[10px] text-slate-400 mt-1 ${

@@ -153,7 +153,7 @@ function DoctorsClient() {
         {loading ? "Loading…" : failed ? "" : `${doctors.length} doctor${doctors.length === 1 ? "" : "s"} found`}
       </p>
 
-      <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-3 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {loading &&
           !failed &&
           [0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-52 rounded-xl" />)}
