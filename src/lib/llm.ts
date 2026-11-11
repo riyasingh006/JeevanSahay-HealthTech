@@ -1,7 +1,7 @@
 /**
  * Genuine LLM layer for जीवन AI (server-only).
  *
- * Primary provider: Google Gemini (official @google/genai SDK, free tier),
+ * Primary provider: Google Gemini API (official @google/genai SDK),
  * key read from `GEMINI_API_KEY`. Fallback provider: OpenAI SDK, key read
  * from `OPENAI_API_KEY`. Both are server-side only, never exposed through
  * NEXT_PUBLIC_*.
@@ -13,7 +13,7 @@
  * back to another provider.
  */
 
-import { GoogleGenAI } from "@google/genai";
+import { FinishReason, GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 
 export const AI_SYSTEM_PROMPT = `You are जीवन AI (Jeevan AI), the in-app healthcare navigation assistant of Jeevan Sahay — a hospital-finding platform.
@@ -79,19 +79,10 @@ export class LlmCallError extends Error {
   }
 }
 
-/**
- * Gemini models tried in order. Every entry is a Google Gemini free-tier model
- * (no paid provider is ever contacted). `gemini-flash-latest` is intentionally
- * NOT used: that alias currently resolves to a model Google reports as
- * overloaded ("This model is currently experiencing high demand", HTTP 503).
- * The Flash-Lite models are the fastest and the least capacity-constrained on
- * the free tier, so they lead the chain.
- */
 const DEFAULT_GEMINI_MODELS = [
   "gemini-3.5-flash-lite",
-  "gemini-flash-lite-latest",
-  "gemini-3.7-flash",
   "gemini-3.6-flash",
+  "gemini-3.1-flash-lite",
 ];
 
 /** Hard cap on upstream Gemini attempts for one user request (whole chain). */
@@ -104,7 +95,7 @@ const ATTEMPTS_PER_MODEL = 2;
 /**
  * Ordered model chain. `GEMINI_MODEL` (when set) is tried first and the
  * default chain still follows it, so pinning a model never removes the
- * automatic failover to a healthy free-tier model.
+ * automatic failover to another model in the default chain.
  */
 function geminiModelChain(): string[] {
   const chain: string[] = [];
@@ -170,7 +161,10 @@ function buildMessages(
 let cachedGemini: GoogleGenAI | null = null;
 function getGemini(): GoogleGenAI {
   if (!cachedGemini) {
-    cachedGemini = new GoogleGenAI({ apiKey: geminiKey() });
+    cachedGemini = new GoogleGenAI({
+      apiKey: geminiKey(),
+      httpOptions: { retryOptions: { attempts: 1 } },
+    });
   }
   return cachedGemini;
 }
@@ -250,8 +244,8 @@ function classifyGeminiError(
   ) {
     return new LlmCallError(
       "quota",
-      `The Gemini API free-tier quota is exhausted for ${model} (HTTP ${status ?? 429}). ` +
-        "Limits reset per minute/day — wait for the reset and try again. No paid fallback is used.",
+      `The Gemini API quota or rate limit was reached for ${model} (HTTP ${status ?? 429}). ` +
+        "Check the project's quota and billing, or try again later. No other provider is used for this request.",
       extra
     );
   }
@@ -361,18 +355,17 @@ const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
  * failures (bad key, permission denied, invalid request) are never retried.
  */
 function isRetryableGemini(err: LlmCallError): boolean {
-  if (err.kind === "aborted" || err.kind === "unconfigured" || err.kind === "rejected") return false;
-  if (err.kind === "stream") return true; // empty reply: another model may serve it
   if (typeof err.status === "number") return RETRYABLE_STATUS.has(err.status);
-  return /overload|unavailable|temporar|try again|timed out|timeout|econnreset|etimedout|eai_again|fetch failed/i.test(
+  if (err.kind === "aborted" || err.kind === "unconfigured" || err.kind === "rejected") return false;
+  if (err.kind === "stream") return true;
+  return /overload|unavailable|temporar|try again|timed out|timeout|econnreset|etimedout|eai_again|fetch failed|incomplete json segment|incomplete stream|stream ended before completion/i.test(
     err.message
   );
 }
 
 /**
- * True when the quota error is a per-day free-tier limit, which cannot clear
- * within this request — such a model must not be retried, but other models in
- * the chain have their own separate daily quota.
+ * True when the provider reports a daily quota limit that cannot clear
+ * within this request, so the current model should not be retried.
  */
 function isDailyQuota(err: LlmCallError): boolean {
   const text = `${err.detail ?? ""} ${err.message}`;
@@ -389,80 +382,155 @@ function logGeminiFailure(model: string, attempt: number, err: LlmCallError): vo
       kind: err.kind,
       status: err.status,
       code: err.code,
-      detail: err.detail ? redactSecrets(err.detail).slice(0, 300) : undefined,
     })
   );
 }
 
 /** One streaming attempt against Gemini. */
+type GeminiRequestBudget = { used: number };
+
 async function geminiAttempt(opts: {
   history: ChatMessage[];
   contextNote?: string;
   signal?: AbortSignal;
   timeoutSignal: AbortSignal;
   model: string;
+  requestBudget: GeminiRequestBudget;
   onDelta?: (chunk: string) => void;
 }): Promise<string> {
-  // Client disconnects abort immediately; our own timeout surfaces as a
-  // clear "timed out" error instead of an empty reply.
   const signal =
     opts.signal && opts.signal !== opts.timeoutSignal
       ? AbortSignal.any([opts.signal, opts.timeoutSignal])
       : opts.timeoutSignal;
-
-  let stream: AsyncIterable<{ text?: string }>;
-  try {
-    stream = await getGemini().models.generateContentStream({
-      model: opts.model,
-      contents: opts.history.slice(-10).map((m) => ({
-        role: m.role === "assistant" ? ("model" as const) : ("user" as const),
-        parts: [{ text: m.content }],
-      })),
-      config: {
-        systemInstruction: buildSystemText(opts.contextNote),
-        temperature: 0.4,
-        maxOutputTokens: 800,
-        abortSignal: signal,
-      },
-    });
-  } catch (err) {
-    if (opts.timeoutSignal.aborted && !opts.signal?.aborted) {
-      throw new LlmCallError(
-        "unreachable",
-        "The Gemini request timed out. Please try again.",
-        { detail: `timeout model=${opts.model}` }
-      );
-    }
-    throw classifyGeminiError(err, { signal: opts.signal, model: opts.model });
-  }
-
   let full = "";
-  try {
-    for await (const chunk of stream) {
-      const delta = chunk.text;
-      if (delta) {
-        full += delta;
-        opts.onDelta?.(delta);
-      }
+  let continuationToken: string | undefined;
+
+  for (;;) {
+    if (opts.requestBudget.used >= MAX_GEMINI_ATTEMPTS) {
+      throw new LlmCallError("stream", "The Gemini request limit was reached.", {
+        partial: full.length > 0,
+      });
     }
-  } catch (err) {
+    opts.requestBudget.used++;
+    let stream: AsyncIterable<{
+      text?: string;
+      candidates?: Array<{ finishReason?: FinishReason; continuationToken?: string }>;
+    }>;
+    try {
+      stream = await getGemini().models.generateContentStream({
+        model: opts.model,
+        contents: opts.history.slice(-10).map((m) => ({
+          role: m.role === "assistant" ? ("model" as const) : ("user" as const),
+          parts: [{ text: m.content }],
+        })),
+        config: {
+          systemInstruction: buildSystemText(opts.contextNote),
+          maxOutputTokens: 800,
+          abortSignal: signal,
+          store: false,
+          automaticContinuation: false,
+          ...(continuationToken ? { continuationToken } : {}),
+        },
+      });
+    } catch (err) {
+      if (opts.timeoutSignal.aborted && !opts.signal?.aborted) {
+        throw new LlmCallError(
+          "unreachable",
+          "The Gemini request timed out. Please try again.",
+          { detail: `timeout model=${opts.model}` }
+        );
+      }
+      throw classifyGeminiError(err, { signal: opts.signal, model: opts.model });
+    }
+
+    let finishReason: FinishReason | undefined;
+    let nextContinuationToken: string | undefined;
+    try {
+      for await (const chunk of stream) {
+        const candidate = chunk.candidates?.[0];
+        if (candidate?.finishReason !== undefined) finishReason = candidate.finishReason;
+        if (candidate?.continuationToken) nextContinuationToken = candidate.continuationToken;
+        const delta = chunk.text;
+        if (delta) {
+          full += delta;
+          opts.onDelta?.(delta);
+        }
+      }
+    } catch (err) {
+      if (opts.signal?.aborted) {
+        throw new LlmCallError("aborted", "The AI request was cancelled.", {
+          partial: full.length > 0,
+        });
+      }
+      if (opts.timeoutSignal.aborted) {
+        throw new LlmCallError(
+          "unreachable",
+          "The Gemini request timed out. Please try again.",
+          { partial: full.length > 0, detail: `timeout model=${opts.model}` }
+        );
+      }
+      const classified = classifyGeminiError(err, { signal: opts.signal, model: opts.model });
+      classified.partial = full.length > 0;
+      throw classified;
+    }
+
     if (opts.signal?.aborted) {
-      if (full) return full; // client stopped mid-stream: keep what we have
-      throw new LlmCallError("aborted", "The AI request was cancelled.");
+      throw new LlmCallError("aborted", "The AI request was cancelled.", {
+        partial: full.length > 0,
+      });
     }
     if (opts.timeoutSignal.aborted) {
-      if (full) return full;
       throw new LlmCallError(
         "unreachable",
         "The Gemini request timed out. Please try again.",
-        { detail: `timeout model=${opts.model}` }
+        { partial: full.length > 0, detail: `timeout model=${opts.model}` }
       );
     }
-    const classified = classifyGeminiError(err, { signal: opts.signal, model: opts.model });
-    // Text was already streamed: do not let another model answer on top of it.
-    classified.partial = full.length > 0;
-    throw classified;
+
+    if (
+      nextContinuationToken &&
+      (finishReason === undefined || finishReason === FinishReason.CONTINUATION)
+    ) {
+      if (nextContinuationToken === continuationToken) {
+        throw new LlmCallError(
+          "unreachable",
+          "The Gemini stream repeated a continuation checkpoint.",
+          { partial: full.length > 0, detail: `repeated continuation model=${opts.model}` }
+        );
+      }
+      continuationToken = nextContinuationToken;
+      continue;
+    }
+    if (finishReason === undefined || finishReason === FinishReason.CONTINUATION) {
+      throw new LlmCallError(
+        "unreachable",
+        "The Gemini stream ended before the response was complete.",
+        { partial: full.length > 0, detail: `incomplete stream model=${opts.model}` }
+      );
+    }
+    if (finishReason === FinishReason.MAX_TOKENS) {
+      throw new LlmCallError(
+        "stream",
+        "The Gemini response reached its output limit before completion.",
+        { partial: full.length > 0, detail: `output limit model=${opts.model}` }
+      );
+    }
+    if (finishReason !== FinishReason.STOP) {
+      throw new LlmCallError(
+        "stream",
+        "The Gemini model did not complete the response.",
+        {
+          status: 400,
+          code: String(finishReason),
+          partial: full.length > 0,
+          detail: `non-final finish reason=${String(finishReason)} model=${opts.model}`,
+        }
+      );
+    }
+
+    break;
   }
+
   if (!full.trim()) {
     throw new LlmCallError("stream", "The Gemini model returned an empty response.", {
       detail: `empty response model=${opts.model}`,
@@ -472,15 +540,12 @@ async function geminiAttempt(opts: {
 }
 
 /**
- * Streams a reply via the Gemini free tier (primary provider).
+ * Streams a reply via Gemini.
  *
- * The free tier is shared, so individual models intermittently answer HTTP 503
- * ("high demand") or HTTP 429 (rate/quota). This walks an ordered chain of
- * free-tier models: a transient failure is retried once on the same model with
- * exponential backoff, then the chain moves to the next model (each model has
- * its own free-tier quota). Attempts are hard-capped so the user is never
- * delayed indefinitely, and a model switch only happens before any text has
- * been streamed, so the chat never shows duplicated answers.
+ * Transient capacity, rate-limit and quota errors are retried with bounded
+ * exponential backoff, then the chain moves to the next configured model.
+ * Attempts are hard-capped, and a model switch only happens before any text
+ * has been streamed, so the chat never shows duplicated answers.
  */
 async function streamGeminiReply(opts: {
   history: ChatMessage[];
@@ -490,40 +555,43 @@ async function streamGeminiReply(opts: {
 }): Promise<string> {
   const timeoutSignal = AbortSignal.timeout(90_000);
   const chain = geminiModelChain();
-  let attempts = 0;
+  const requestBudget: GeminiRequestBudget = { used: 0 };
+  let retryCount = 0;
   let lastErr: LlmCallError | undefined;
 
-  for (const model of chain) {
+  for (const [modelIndex, model] of chain.entries()) {
     let modelAttempts = 0;
-    while (attempts < MAX_GEMINI_ATTEMPTS) {
-      attempts++;
+    while (modelAttempts < ATTEMPTS_PER_MODEL && requestBudget.used < MAX_GEMINI_ATTEMPTS) {
       modelAttempts++;
       try {
-        return await geminiAttempt({ ...opts, timeoutSignal, model });
+        return await geminiAttempt({ ...opts, timeoutSignal, model, requestBudget });
       } catch (err) {
         const llmErr =
           err instanceof LlmCallError
             ? err
             : classifyGeminiError(err, { signal: opts.signal, model });
         lastErr = llmErr;
-        logGeminiFailure(model, attempts, llmErr);
-
-        // Already streamed text: never retry, never switch models.
+        logGeminiFailure(model, requestBudget.used, llmErr);
         if (llmErr.partial) throw llmErr;
-        // A retired model (HTTP 404): move straight to the next one.
         if (llmErr.status === 404) break;
-        // Permanent failures (invalid key, permission, bad request): stop now.
         if (!isRetryableGemini(llmErr)) throw llmErr;
-        // Daily quota for this model is gone; another model has its own quota.
         if (llmErr.kind === "quota" && isDailyQuota(llmErr)) break;
-        if (llmErr.kind === "stream") break; // empty reply: try another model
-        if (modelAttempts >= ATTEMPTS_PER_MODEL || attempts >= MAX_GEMINI_ATTEMPTS) break;
+        if (llmErr.kind === "stream") break;
+        if (requestBudget.used >= MAX_GEMINI_ATTEMPTS) break;
 
-        await sleep(GEMINI_BACKOFF_MS[Math.min(modelAttempts - 1, GEMINI_BACKOFF_MS.length - 1)]);
-        if (opts.signal?.aborted) throw llmErr;
+        const hasNextAttempt = modelAttempts < ATTEMPTS_PER_MODEL;
+        const hasNextModel = modelIndex < chain.length - 1;
+        if (!hasNextAttempt && !hasNextModel) break;
+        const baseDelay = GEMINI_BACKOFF_MS[Math.min(retryCount, GEMINI_BACKOFF_MS.length - 1)];
+        retryCount++;
+        await sleep(Math.round(baseDelay * (0.8 + Math.random() * 0.4)));
+        if (opts.signal?.aborted) {
+          throw new LlmCallError("aborted", "The AI request was cancelled.");
+        }
+        if (!hasNextAttempt) break;
       }
     }
-    if (attempts >= MAX_GEMINI_ATTEMPTS) break;
+    if (requestBudget.used >= MAX_GEMINI_ATTEMPTS) break;
   }
 
   throw (
@@ -570,15 +638,37 @@ async function streamOpenAIReply(opts: {
       }
     }
   } catch (err) {
+    if (opts.signal?.aborted) {
+      throw new LlmCallError("aborted", "The AI request was cancelled.", {
+        partial: full.length > 0,
+      });
+    }
+    if (signal.aborted) {
+      throw new LlmCallError("unreachable", "The OpenAI request timed out. Please try again.", {
+        partial: full.length > 0,
+      });
+    }
     if (
-      opts.signal?.aborted ||
       (err as { name?: string })?.name === "APIUserAbortError" ||
       (err as { name?: string })?.name === "AbortError"
     ) {
-      if (full) return full; // client stopped mid-stream: keep what we have
-      throw new LlmCallError("aborted", "The AI request was cancelled.");
+      throw new LlmCallError("stream", "The AI response stream was interrupted.", {
+        partial: full.length > 0,
+      });
     }
-    throw new LlmCallError("stream", "The AI response stream was interrupted.");
+    throw new LlmCallError("stream", "The AI response stream was interrupted.", {
+      partial: full.length > 0,
+    });
+  }
+  if (opts.signal?.aborted) {
+    throw new LlmCallError("aborted", "The AI request was cancelled.", {
+      partial: full.length > 0,
+    });
+  }
+  if (signal.aborted) {
+    throw new LlmCallError("unreachable", "The OpenAI request timed out. Please try again.", {
+      partial: full.length > 0,
+    });
   }
   if (!full.trim()) {
     throw new LlmCallError("stream", "The AI model returned an empty response.");
@@ -589,9 +679,9 @@ async function streamOpenAIReply(opts: {
 /**
  * Streams a model reply. Each decoded text chunk is pushed to `onDelta`.
  * Resolves with the full accumulated text, or throws `LlmCallError`.
- * Tries Gemini (free tier) first; falls back to OpenAI only when no Gemini
- * key is configured. Gemini quota/limit errors are surfaced as `quota` and
- * never silently switch providers.
+ * Tries Gemini first; falls back to OpenAI only when no Gemini key is
+ * configured. Gemini quota/limit errors are surfaced as `quota` and never
+ * silently switch providers.
  */
 export async function streamAiReply(opts: {
   history: ChatMessage[];

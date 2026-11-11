@@ -98,9 +98,9 @@ type ConfigKind = "unconfigured" | "rejected" | "quota";
 function configMessage(kind: ConfigKind, detail?: string): string {
   if (kind === "quota") {
     return (
-      "AI conversation is unavailable because the Gemini API free-tier quota for this key is exhausted. " +
-      "Wait for the quota to reset and try again. " +
-      "The hospital search results above are still real and usable."
+      "AI conversation is unavailable because the Gemini API quota or rate limit has been reached. " +
+      "Check the configured project's quota and billing, or try again later. " +
+      "No other AI provider was used for this request."
     );
   }
   if (kind === "rejected") {
@@ -616,7 +616,6 @@ export const POST = withApi(
         } catch (err) {
           if (err instanceof LlmCallError) {
             if (err.kind === "aborted") {
-              send({ type: "done", reply, engine: "llm", aiStatus: finalAiStatus });
               closed = true;
               try {
                 controller.close();
@@ -658,6 +657,7 @@ export const POST = withApi(
               searchPerformed,
             });
           }
+          send({ type: "replace", text: "" });
           for (const chunk of chunkText(reply)) send({ type: "delta", text: chunk });
         }
 
