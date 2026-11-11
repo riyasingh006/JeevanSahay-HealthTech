@@ -1,91 +1,265 @@
-# Jeevan Sahay
+<div align="center"><!-- Jeevan Sahay | Brand palette: Healthcare Navy • Saffron Orange • Care Green --><h1>
+  <span style="color:#F07800;">जीवन</span>
+  <span style="color:#0B2F78;">Sahay</span>
+</h1>सही अस्पताल। सही समय। सही देखभाल।
+AI-Powered Healthcare Navigation & Hospital Management Platform
+<p>
+  <a href="https://jeevansahay-healthtech.onrender.com"><strong>🌐 Live Application</strong></a>
+  &nbsp;•&nbsp;
+  <a href="https://github.com/riyasingh006/JeevanSahay-HealthTech"><strong>💻 GitHub Repository</strong></a>
+</p>
 
-A Next.js healthcare-directory application with patient, hospital and super-admin roles. The existing Patient Portal and hospital UI are retained; the authentication and hospital-management workflows are connected to the database.
 
-## Current implementation
 
-- Authentication: patient signup, email verification, passwordless email code, password recovery, Google OIDC/PKCE, revocable sessions and role checks.
-- Patient portal: private profile, hospital search, saved hospitals, appointment requests/cancellation and PIN-protected health sharing.
-- Hospital portal: verified-hospital-only dashboard, bed inventory, departments, doctors, services, appointment handling, emergency case log, profile, notifications, settings and persisted analytics.
-- Hospital updates to itemised beds update the patient-facing availability aggregates transactionally. Hospital accounts cannot read or modify another hospital's records.
-- Admin portal: protected overview and analytics, hospital application verification/rejection, searchable account suspension/reactivation, report triage, CSV exports and read-only audit review. Admin actions are role-checked, audited and session-revoking where appropriate.
-- Hospital applicants remain pending until a super-admin approves them; approval/rejection is transactional, creates an in-app notification and sends an email when SMTP is configured. Approvals require verified email and confirmed map coordinates.
-- PostgreSQL is the sole Prisma provider. A versioned PostgreSQL baseline preserves all models, relations, constraints and indexes. Historical SQLite migration SQL is retained outside Prisma's active migrations folder. Render stores application data in Neon; no local database file is used in production.
-- Demo accounts and sample hospitals/doctors are explicitly marked. Regular patient searches and public statistics exclude those fixtures; demo accounts see clear sample-data labels, and sample records cannot be treated as confirmed capacity or used to book care. Facility-entered availability is not a live feed; the app does not dispatch emergency services.
 
-## Local setup
 
-Requirements: Node.js 22, npm and PostgreSQL connection strings from Neon. Runtime queries use Neon's pooled URL; Prisma migrations use its direct URL.
+<table>
+<tr>
+<td align="center"><strong>🔎 SEARCH</strong><br/>Hospital listings</td>
+<td align="center"><strong>🛏️ CHECK</strong><br/>Reported information</td>
+<td align="center"><strong>🩺 BROWSE</strong><br/>Doctor listings</td>
+<td align="center"><strong>🚨 CARE</strong><br/>Emergency navigation</td>
+</tr>
+</table></div>🟦 About the Project
+Jeevan Sahay is a full-stack healthcare navigation and hospital-management platform that brings patients, hospitals, and platform administrators into one connected digital experience.
 
-```sh
+Inspired by a simple promise — the right hospital, at the right time, with the right care — the platform combines hospital and doctor discovery, patient workflows, hospital operations, and protected administrative tools.
+
+The application has three role-based experiences:
+Portal	Designed for	What it enables
+🧑‍⚕️ Patient Portal	Patients and visitors	Discover hospitals, browse doctors, save facilities, request appointments and use protected health-sharing workflows.
+🏥 Hospital Portal	Approved hospital teams	Manage facility information, beds, doctors, departments, services, appointments and operational records.
+🛡️ Super Admin Portal	Platform administrators	Review hospital applications, manage accounts, triage reports and inspect audit information.
+
+
+Important: Jeevan Sahay is a healthcare information and workflow platform. Facility-reported availability may be outdated and should be confirmed directly with the facility before travelling. The application does not dispatch emergency services.
+
+🧭 Platform at a Glance
+<div align="center"><span style="color:#0B2F78">PATIENT EXPERIENCE</span>	<span style="color:#F07800">HOSPITAL OPERATIONS</span>	<span style="color:#269B45">PLATFORM OVERSIGHT</span>
+Find hospitals	Manage beds	Verify hospitals
+Browse doctors	Manage doctors	Manage accounts
+Save facilities	Handle appointments	Review reports
+Request appointments	Manage services	Audit activity
+Protected health sharing	View analytics	Export reports
+
+
+</div>✨ Features
+🧑‍⚕️ Patient Portal
+- Patient registration and email verification.
+- Password-based and passwordless email-code authentication flows.
+- Password recovery and reset.
+- Google sign-in when OAuth is configured.
+- Private patient profile and protected sessions.
+- Hospital discovery and search.
+- Doctor and specialist listings.
+- Saved hospitals and facilities.
+- Appointment requests and cancellation.
+- PIN-protected health sharing.
+- Emergency-care navigation and facility information.
+- Clear labels for sample/demo information.
+🏥 Hospital Portal
+Hospital access is restricted to approved hospital accounts.
+- Hospital dashboard and persisted analytics.
+- Bed inventory management.
+- Departments and doctor management.
+- Hospital services and profile management.
+- Appointment handling.
+- Emergency case log.
+- Notifications and settings.
+- Transactional updates from itemised beds to patient-facing availability aggregates.
+- Tenant isolation: one hospital cannot read or modify another hospital's records.
+🛡️ Super Admin Portal
+- Protected overview and analytics.
+- Hospital application verification and rejection.
+- Searchable account management.
+- Account suspension and reactivation.
+- Report triage.
+- CSV exports.
+- Read-only audit review.
+- Role-checked and audited administrative actions.
+- Session revocation where appropriate.
+🔐 Authentication & Access Control
+- Revocable sessions and role checks.
+- Google OIDC/PKCE sign-in when configured.
+- Hashed, time-limited and attempt-limited OTPs.
+- Hospital approval workflow.
+- Hospital applicants remain pending until approved by a super-admin.
+- Approval requires verified email and confirmed map coordinates.
+- No public super-admin registration.
+- Approval/rejection is transactional and creates an in-app notification; email is sent when delivery is configured.
+🤖 AI Healthcare Assistant
+The project contains an AI assistant integration with request handling and streaming-reliability safeguards. AI provider credentials and model configuration are server-side.
+
+Provider compliance is a release blocker for clinical use. The Gemini API terms documented in this repository restrict clinical-practice use and providing medical advice, and include consumer and under-18 restrictions. These conditions conflict with the intended healthcare-assistant scope. Do not enable Gemini for real-patient symptom analysis, health advice or emergency guidance, and do not submit real patient data to Gemini. Before enabling the assistant for its intended audience and scope, select a provider/service whose current terms explicitly permit that use and whose privacy, retention and data-processing controls meet the application's requirements.
+
+store: false is not a zero-data-retention guarantee and does not override provider terms.
+🎨 Design Language
+The product interface uses a clean healthcare-navigation style:
+Brand element	Direction
+Healthcare Navy	Primary navigation, headings, key actions and trust-focused surfaces
+Saffron Orange	Highlights, emphasis and important visual accents
+Care Green	Positive states and care-related indicators
+Clean White	Main surfaces and content areas
+Soft Blue / Light Neutral	Supporting panels, borders and backgrounds
+Rounded cards	Clear, approachable information grouping
+Responsive layouts	Desktop, laptop, tablet and mobile use
+
+
+The README uses the same navy/orange/green visual direction. GitHub controls README rendering, so custom CSS and exact website styling cannot be imposed on the repository page.
+📱 Responsive Experience
+The application has undergone a local responsive audit and targeted layout corrections.
+
+Reported post-fix verification:
+- 32 application routes.
+- 10 viewport sizes, from 320px mobile width through 1440px desktop width.
+- 320 route/viewport combinations.
+- Zero horizontal-overflow issues in the reported post-fix matrix.
+- Zero navigation/evaluation failures in that audit.
+- Desktop screenshot comparison at 1440 × 900.
+These are local audit results for the development branch. They do not prove that the changes have been merged or deployed to the live application. Re-run responsive checks after later UI changes and verify the deployed build separately.
+🧱 Technology Stack
+Layer	Technology
+Framework	Next.js 16
+UI	React, TypeScript, CSS Modules and Tailwind utilities where used
+Runtime	Node.js 22
+ORM	Prisma 6
+Database	PostgreSQL
+Production database	Neon PostgreSQL
+Authentication	Application-managed sessions, jose, bcryptjs, Google OIDC/PKCE
+Email	Resend HTTPS API or provider-compatible SMTP
+Maps	Google Maps / Places / Geocoding when configured
+AI integration	Configurable server-side AI provider integration
+Hosting	Render Web Service
+Quality checks	Project test scripts, TypeScript, ESLint and production build
+
+
+🏗️ System Architecture
+```mermaid
+flowchart TB
+    P[Patients] --> APP[Next.js Application]
+    H[Hospital Teams] --> APP
+    S[Super Admin] --> APP
+
+    APP --> AUTH[Authentication & Role Authorization]
+    APP --> API[Next.js API Routes]
+    API --> CORE[Application Workflows]
+    CORE --> ORM[Prisma ORM]
+    ORM --> DB[(Neon PostgreSQL)]
+
+    API --> EMAIL[Resend HTTPS / SMTP]
+    API --> MAPS[Google Maps Services]
+    API --> AI[Configured AI Provider]
+```
+Architecture note: the UI and /api/* routes run in the same Next.js application and share one origin. There is no separately deployed frontend/backend pair in the current architecture.
+🗃️ Database & Data Handling
+- PostgreSQL is the sole active Prisma provider.
+- Runtime queries use Neon's pooled connection URL.
+- Prisma migrations use Neon's direct connection URL.
+- A versioned PostgreSQL baseline preserves current models, relations, constraints and indexes.
+- Historical SQLite migration SQL is retained in prisma/migrations-sqlite-legacy/ for reference and is not part of the active PostgreSQL migration path.
+- The provider migration creates PostgreSQL schema objects; it does not copy rows from a separate SQLite database.
+- Production application data is stored in Neon, not on Render's ephemeral filesystem.
+- Bed inventory updates and patient-facing availability aggregates are updated transactionally.
+Demo Data vs Operational Data
+Demo accounts and sample hospitals/doctors are explicitly marked. Regular patient searches and public statistics exclude those fixtures. Demo accounts see sample-data labels, and sample records cannot be treated as confirmed capacity or used to book care.
+
+Demo data is fictional. It must never be used for real-care decisions.
+🔒 Security & Privacy
+- Session cookies are HttpOnly and SameSite=Lax; production cookies use Secure.
+- OTPs are hashed, expire after five minutes, are attempt-limited, and are never returned or logged.
+- Hospital records are tenant-scoped.
+- Administrative actions are role-checked and audited.
+- Relevant administrative actions can revoke sessions.
+- Secrets and provider credentials are not stored in the repository.
+- .env must remain out of Git.
+- Use fictional data for development and tests.
+- Never use production databases for integration testing.
+- Review provider terms, retention behavior and data-processing controls before sending sensitive information to an AI service.
+⚙️ Local Setup
+Prerequisites
+- Node.js 22
+- npm
+- PostgreSQL database (local PostgreSQL or Neon)
+- Git
+1. Clone the repository
+git clone https://github.com/riyasingh006/JeevanSahay-HealthTech.git
+cd JeevanSahay-HealthTech
+2. Install dependencies
 npm ci
+3. Create your environment file
 cp .env.example .env
-```
-
-Set a random `SESSION_SECRET` of at least 32 bytes (for example, `openssl rand -hex 32`). Real OTP verification, password recovery and email notifications require either a Resend API key with a verified sender domain or provider-compatible SMTP settings. Google sign-in is optional and requires a Google OAuth Web application client, both client credentials, and an exact HTTPS callback registered in Google Cloud Console. See the environment-variable reference below.
-
-For a **new local database**, apply the checked-in migrations and start the app:
-
-```sh
+Windows PowerShell:
+Copy-Item .env.example .env
+Add the required local values to .env. Generate a unique SESSION_SECRET of at least 32 bytes. Never commit secrets or paste them into screenshots, issues or pull requests.
+4. Configure PostgreSQL
+Set:
+- DATABASE_URL — pooled PostgreSQL URL for application queries.
+- DIRECT_URL — direct, non-pooled PostgreSQL URL for Prisma migrations.
+For Neon, the pooled hostname contains -pooler; the direct hostname does not. Keep both URLs private and use TLS.
+5. Apply migrations
 npm run db:migrate:deploy
+6. Start the application
 npm run dev
-```
+Open http://localhost:3000.
 
-Open `http://localhost:3000`. Existing users and hospitals are not created automatically. Use `npm run db:migrate:status` to inspect migration state. Create future development migrations with `npm run db:migrate:dev -- --name concise_change_name` against a disposable/local database, then review the generated SQL before committing it. `npm run db:push` is reserved for the disposable integration-test harness and fresh throwaway databases.
+Existing users and hospitals are not created automatically. Use the super-admin bootstrap procedure when the first administrator is required.
+🔑 Environment Variables
+Variable	Requirement	Purpose
+DATABASE_URL	Required	Neon pooled PostgreSQL URL for runtime queries. Secret.
+DIRECT_URL	Required	Direct PostgreSQL URL for Prisma migrations. Secret.
+TEST_DATABASE_URL	Tests only	Disposable local PostgreSQL test database. Tests reject remote hosts and non-test database names. Never use production.
+SESSION_SECRET	Required	Random session/token signing secret of at least 32 bytes.
+SMTP_HOST	Conditional	SMTP host when Resend is not configured.
+SMTP_PORT	Conditional	Provider-supported SMTP port.
+SMTP_USER	Conditional	SMTP username.
+SMTP_PASSWORD	Conditional	SMTP password; store as a deployment secret.
+SMTP_FROM	Email required	Sender identity verified with the selected provider.
+SMTP_SECURE	Optional	SMTP TLS mode. false uses STARTTLS; true uses implicit TLS. Port 465 implies TLS.
+RESEND_API_KEY	Optional	Resend HTTPS API key; preferred on Render Free when sender is verified.
+NEXT_PUBLIC_APP_URL	Optional on Render	Canonical public HTTPS origin for links and OAuth. Not a secret.
+GOOGLE_CLIENT_ID	Optional	Google OAuth Web application client ID.
+GOOGLE_CLIENT_SECRET	Optional	Google OAuth client secret; server-side only.
+GOOGLE_REDIRECT_URI	Optional	Exact OAuth callback URL registered in Google Cloud Console.
+GOOGLE_MAPS_API_KEY	Optional	Google Places/Geocoding integration.
+GEMINI_API_KEY	Optional	Gemini integration key; do not enable for prohibited healthcare use.
+GEMINI_MODEL	Optional	Gemini model override; verify current availability and terms.
+OPENAI_API_KEY	Optional	OpenAI API key for configured integration.
+OPENAI_BASE_URL	Optional	Custom OpenAI-compatible base URL.
+OPENAI_MODEL	Optional	Model name for configured OpenAI-compatible integration.
+SEED_DEMO_DATA	Keep false in production	Enables fictional local demo fixtures; production seeding is refused.
+SEED_SUPER_ADMIN_EMAIL	Bootstrap only	First super-admin email.
+SEED_SUPER_ADMIN_PASSWORD	Bootstrap only	Temporary unique password, 16–72 bytes; remove after provisioning.
+SEED_SUPER_ADMIN_NAME	Optional	First super-admin display name.
+NODE_VERSION	Blueprint-managed	Pins Node.js 22.
+PORT	Render-managed	Port supplied by Render.
+NODE_ENV	Render-managed	Runtime environment supplied by Render.
+RENDER_EXTERNAL_URL	Render-managed	Public Render service URL.
 
-### SQLite data and migration history
 
-The active migration `20261104100000_postgresql_baseline` creates the PostgreSQL schema from the current Prisma models. The old SQLite migration files are preserved in `prisma/migrations-sqlite-legacy/` for reference and are not applied to PostgreSQL. This provider change creates schema objects; it does not copy rows from a separate SQLite database. No `prisma/dev.db` file exists in this checkout. The production Render/Neon service is configured outside this repository; this code change does not connect to or modify that service or its data. If you have a separate SQLite database containing records, keep an untouched backup and arrange a reviewed data transfer before switching real users to Neon; do not point the PostgreSQL migrations at the SQLite file or reset either database.
+Email Configuration
+Real OTP verification, password recovery and notifications require either:
+1. Resend HTTPS API with a verified sender domain; or
+2. SMTP settings supported by the provider and hosting network.
+Render Free blocks outbound SMTP ports 25, 465 and 587. Port 2525 is provider-specific, not a universal workaround. Prefer Resend HTTPS on Render Free when configured and verified.
+Google OAuth Configuration
+Create a Google OAuth client of type Web application.
 
-## Render deployment
-
-`render.yaml` defines one Next.js web service: the UI and `/api/*` routes share a same-origin URL, with no separate frontend/backend service or CORS allowlist. It is configured for Render's Free web-service plan and has no attached disk; persistent application data lives in Neon. On each service start, `prisma migrate deploy` runs before Next.js, using `DIRECT_URL`; runtime requests use the pooled `DATABASE_URL`. Auto-deploy is disabled and the configured health-check path is `/api/health`. That public endpoint checks only that the Next.js process can answer; it does not wait for Neon or an email/API provider. Render expects an HTTP health-check response within five seconds and can cancel a deploy after repeated failures. Free services sleep after 15 minutes without inbound traffic and take about a minute to wake; that cold start can look like a request timeout. Render Free also has ephemeral filesystems and no persistent disk ([Free-service limitations](https://render.com/docs/free), [health checks](https://render.com/docs/health-checks)).
-
-This code change does not deploy the service or alter production settings. Keep Render auto-deploy disabled until you review and deploy the PR yourself. Set `DATABASE_URL` to Neon's pooled endpoint (hostname includes `-pooler`) and `DIRECT_URL` to the direct, non-pooled endpoint; the application applies bounded pool and timeout parameters to the runtime URL and removes the legacy `pgbouncer=true` flag. Free web services block outbound SMTP ports `25`, `465` and `587`. Port `2525` is not a universal provider capability; prefer the Resend HTTPS API on Free, or confirm the exact host, port and TLS mode with your SMTP provider. Create a Google OAuth client of type **Web application**. Register `https://<render-service-host>/api/auth/google/callback` as an exact Authorized redirect URI. The current server-side OAuth flow does not use Authorized JavaScript origins; if that field is populated, use only the origin `https://<render-service-host>` with no path. For local testing, register `http://localhost:3000/api/auth/google/callback` as a separate redirect URI. The app uses Render's `RENDER_EXTERNAL_URL` when `GOOGLE_REDIRECT_URI` is unset; in production it refuses an insecure or missing public origin. If you set `NEXT_PUBLIC_APP_URL`, use the same public HTTPS origin. Any explicit `GOOGLE_REDIRECT_URI` must use that same origin and the exact callback path.
-
-| Variable | Used by | Requirement | Purpose and value source |
-|---|---|---|---|
-| `DATABASE_URL` | Backend | Required; set in Render | Neon pooled PostgreSQL URL with a `-pooler` hostname, used only for app queries. Runtime enforces TLS and sets `connect_timeout=15`, `connection_limit=3`, `pool_timeout=15`, `max_idle_connection_lifetime=240`, and `socket_timeout=30`; do not add `pgbouncer=true` for Neon's current PgBouncer. Keep the URL secret. |
-| `DIRECT_URL` | Prisma CLI | Required; set in Render | Neon direct PostgreSQL URL without `-pooler`, used only for Prisma migrations. Use TLS (`sslmode=require`) and keep the URL secret. |
-| `TEST_DATABASE_URL` | Test scripts only | Required only for database/auth integration tests | Disposable local PostgreSQL test database; the tests reject remote hosts and non-test database names. Never point this at production. |
-| `SESSION_SECRET` | Backend | Required; generated by Blueprint | Signs sessions and short-lived tokens; keep private. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | Backend | Required only when Resend is not configured | SMTP host, provider-supported port, login and password. Store the password in Render secrets; do not assume port `2525` is supported by your provider. |
-| `RESEND_API_KEY` | Backend | Optional; preferred for Render Free | Resend API key stored as a Render secret. When present, the app sends through Resend's HTTPS API instead of SMTP; `SMTP_FROM` must use a domain verified in Resend. |
-| `SMTP_FROM` | Backend | Required for Resend or SMTP | Sender address/name from a domain verified with the selected provider. With Resend, the domain must be verified before sending. |
-| `SMTP_SECURE` | Backend | Optional; Blueprint defaults to `false` | SMTP only: `false` uses STARTTLS; `true` uses implicit TLS, and port `465` always implies TLS. Use only a port/TLS mode your provider documents. Render Free blocks outbound `25`, `465` and `587`; port `2525` is provider-specific, so use the HTTPS API if SMTP cannot connect. |
-| `NEXT_PUBLIC_APP_URL` | Frontend + backend | Optional on Render | Canonical public HTTPS origin for email links and OAuth. Render's `RENDER_EXTERNAL_URL` is used when this is unset. Set it to your custom domain if that is the origin registered with Google. Never use the localhost example in production. This is a URL, not a secret. |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Backend | Optional; both required for Google sign-in | Create an OAuth 2.0 Web application in Google Cloud Console. The client secret is sensitive and must remain server-side. |
-| `GOOGLE_REDIRECT_URI` | Backend | Optional | Exact callback URI: `https://<render-service-host>/api/auth/google/callback`. Register the same value in Google Cloud Console. If unset, the app derives it from `RENDER_EXTERNAL_URL` (or the explicit canonical URL). |
-| `GOOGLE_MAPS_API_KEY` | Backend | Optional | Google Cloud Console key for Places/Geocoding. Without it, Places lookup is unavailable and address geocoding uses the app fallback. |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | Backend | Optional | Google AI Studio API key and optional model override for Gemini features. |
-| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Backend | Optional | OpenAI API key; base URL/model are only needed for a custom OpenAI-compatible provider. |
-| `SEED_DEMO_DATA` | Backend | Keep `false` in production | Demo seeding is disabled by default and refused in production. |
-| `SEED_SUPER_ADMIN_EMAIL`, `SEED_SUPER_ADMIN_PASSWORD`, `SEED_SUPER_ADMIN_NAME` | Backend | First super-admin bootstrap only | Run `npm run db:seed` from a trusted local terminal against Neon after setting the values temporarily; Render Free has no Shell access. It creates only the first super-admin, is idempotent for that same account, refuses non-admin promotion and refuses a second admin. Remove the temporary password immediately. |
-| `NODE_VERSION` | Backend | Set by Blueprint | Pins Node.js 22. Render supplies `PORT`, `NODE_ENV` and `RENDER_EXTERNAL_URL`; do not enter those manually. |
-
-Gemini model lifecycle: Google lists `gemini-3.1-flash-lite` for shutdown on 7 May 2027 and recommends `gemini-3.5-flash-lite` as its replacement. The latter is already the first model in the default chain. By 7 April 2027, remove the `gemini-3.1-flash-lite` fallback and rerun `npm run test:gemini` after confirming the remaining supported models and failover order against Google's current model documentation.
-
-Gemini provider restriction and privacy limitation: Google's [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms), effective 23 March 2026, prohibit using the service in clinical practice or to provide medical advice, and limit use to developers building for professional or business purposes rather than consumer use. They also prohibit API clients directed towards, or likely to be accessed by, people under 18; API clients may only be offered in Google-supported regions, and paid services are required for users in the EEA, Switzerland or UK. This app is an end-user healthcare assistant that accepts symptoms, answers health questions and gives emergency guidance; those features do not become permitted by describing them as navigation or adding a disclaimer. Do not send real patient data to Gemini or route around these restrictions. Before enabling the assistant for its intended audience and scope, select a provider/service whose current terms explicitly permit that use and whose data controls meet the app's requirements.
-
-`store: false` on every Generate Content request disables request logging and takes precedence over the project's logging setting, but it is not a zero-data-retention guarantee and does not change permitted use. On paid Gemini API services, Google logs prompts and responses for a limited period to detect and prevent prohibited-use violations, maintain service safety, and make required legal or regulatory disclosures; it may also transiently store or cache data. On unpaid services, Google may use submitted prompts and responses to improve its products and allow human review; do not submit sensitive, confidential or personal information. The Developer API's documented zero-data-retention guidance directs users who need guaranteed zero retention or enterprise data-processing agreements to Vertex AI; verify applicable service terms and retention controls before handling patient data.
-
-The application is a same-origin Next.js server, so there is no separate backend URL or CORS configuration. Session cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` in production. OTPs are hashed, expire after five minutes, are attempt-limited, and are never returned or logged. Resend, SMTP, Google OAuth, Maps and AI provider credentials are not included in the repository; add secrets only in Render's environment settings. Real email delivery requires a verified sender and either Resend API or provider-compatible SMTP; live Google sign-in requires matching Google Cloud credentials and callback settings.
-
-After the initial migration has completed, bootstrap the first super-admin against the intended Render database using the temporary `SEED_SUPER_ADMIN_*` values and `npm run db:seed`; then remove the temporary password. Keep demo seeding disabled. Take a backup before any later migration; do not run `db:push` in production.
-
-## Optional local fixtures and admin bootstrap
-
-The seed script refuses to add fixtures to a non-empty database and refuses demo fixtures in production. To load fictional development data, use an empty local database and run:
-
-```sh
-SEED_DEMO_DATA=true npm run db:seed
-```
-
-The demo accounts and operational figures are fictional; never use that dataset for real care decisions. There is no public admin registration. To provision the first super-admin, set `SEED_SUPER_ADMIN_EMAIL` and a unique 16–72-byte `SEED_SUPER_ADMIN_PASSWORD` (optionally `SEED_SUPER_ADMIN_NAME`) and run `npm run db:seed` from a trusted environment against the intended database. The seed is idempotent only for that same admin and refuses additional super-admins or promotion of an existing non-admin. Remove the temporary password after use. Do not commit `.env`; it is ignored by Git.
-
-## Checks
-
-```sh
+Production callback:
+https://<your-public-host>/api/auth/google/callback
+Local callback:
+http://localhost:3000/api/auth/google/callback
+The callback must exactly match the URI registered in Google Cloud Console. The current server-side flow does not require an Authorized JavaScript origin; if populated, use only the origin without a path.
+👑 First Super Admin Setup
+There is no public super-admin registration.
+1. Confirm the intended database has been migrated.
+2. Set SEED_SUPER_ADMIN_EMAIL and a unique SEED_SUPER_ADMIN_PASSWORD (16–72 bytes). SEED_SUPER_ADMIN_NAME is optional.
+3. Run the seed command from a trusted environment:
+npm run db:seed
+4. Verify the account.
+5. Remove the temporary password immediately.
+The seed is idempotent only for the same first admin. It refuses a second super-admin and refuses promotion of an existing non-admin account. For Render Free, run this from a trusted local terminal against the intended database; the Free web service does not provide Shell access.
+🧪 Testing & Quality Checks
+Run from the repository root:
 npm run typecheck
 npm run lint
 npm run test:scoring
@@ -93,8 +267,103 @@ npm run test:oauth
 npm run test:database
 npm run test:email
 npm run test:auth
+npm run test:gemini
 npm audit
 npm run build
-```
+Test Database Safety
+npm run test:auth requires TEST_DATABASE_URL pointing to a disposable local PostgreSQL database whose name includes test. It refuses remote hosts and non-test database names, then resets only that explicitly named local test database. It also starts a local SMTP capture server and removes any inherited Resend API key so tests cannot send real email.
 
-`npm run test:auth` requires `TEST_DATABASE_URL` pointing to a disposable **local PostgreSQL** database whose name includes `test`; the test refuses remote and non-test databases, then resets only that explicitly named local test database. It also starts a local SMTP capture server and explicitly removes any inherited Resend API key so tests cannot send real email. Coverage includes patient and hospital registration, OTP delivery/limits/expiry, password reset, role access and logout, hospital approval/rejection, admin bootstrap and authorization, session revocation, tenant isolation, audit records and the public health endpoint. `npm run test:email` mocks the Resend HTTPS API and tests sanitized failures without network access. `npm run test:database` requires a disposable local PostgreSQL database and tests the Neon URL bounds, error redaction, and recovery after a connection is forcibly closed; it never resets the database or connects to Neon. `npm run test:oauth` checks HTTPS/public-origin and callback validation offline; the integration suite also checks PKCE/state/nonce binding and rejects state replay, but a live Google login still requires the owner's Google Cloud configuration. Scoring tests check emergency-priority ordering.
+npm run test:database requires a disposable local PostgreSQL database. It tests URL bounds, error redaction and recovery after a connection is forcibly closed. It does not reset the database or connect to Neon.
+
+Additional test notes:
+- test:email mocks the Resend HTTPS API and checks sanitized failures without network email.
+- test:oauth checks HTTPS/public-origin and callback validation offline.
+- OAuth integration tests check PKCE/state/nonce binding and reject state replay. Live Google sign-in still requires owner-managed Google Cloud configuration.
+- Scoring tests check emergency-priority ordering.
+- Gemini reliability tests do not establish provider availability, provider-term compliance or clinical suitability.
+🚀 Deployment: Render + Neon
+The repository's render.yaml defines one Next.js web service. The UI and /api/* routes share the same origin.
+Deployment setting	Configuration
+Hosting	Render Web Service
+Database	Neon PostgreSQL
+Runtime	Node.js 22
+Persistent application data	Neon
+Auto-deploy	Disabled in the configured Blueprint
+Health check	/api/health
+Startup	Prisma migrations, then Next.js
+
+
+Startup command:
+npm run db:migrate:deploy && exec npm run start -- --hostname 0.0.0.0 --port $PORT
+Database URL Rules
+Variable	Connection type
+DATABASE_URL	Neon pooled endpoint; hostname includes -pooler; application queries only.
+DIRECT_URL	Neon direct endpoint; no -pooler; Prisma migrations only.
+
+
+The application applies bounded pool and timeout parameters to the runtime URL. Do not add the legacy pgbouncer=true flag for Neon's current PgBouncer configuration.
+Health Check
+/api/health is a public process-level check. It verifies that the Next.js process can respond; it does not wait for Neon, email delivery or an AI provider. A successful health check does not prove that every external dependency is healthy.
+Render Free Plan Notes
+- Services sleep after 15 minutes without inbound traffic and can take about a minute to wake.
+- The filesystem is ephemeral; do not store persistent user data there.
+- Free services have no attached persistent disk.
+- Outbound SMTP ports 25, 465 and 587 are blocked.
+- Keep auto-deploy disabled until changes have been reviewed and explicitly approved.
+Official references: Render Free services · Render health checks.
+Release Checklist
+- [ ] Review the pull request and all changed files.
+- [ ] Confirm required CI checks are green.
+- [ ] Confirm database tests used only a disposable local database.
+- [ ] Review migrations and take a backup before applying later schema changes.
+- [ ] Verify Render and Neon environment values without exposing secrets.
+- [ ] Verify Google OAuth callback settings if enabled.
+- [ ] Verify email sender domain and delivery settings.
+- [ ] Confirm AI provider terms and data controls permit the intended use.
+- [ ] Merge only after review and explicit approval.
+- [ ] Deploy intentionally and smoke-test production flows.
+Never run npm run db:push in production. Use reviewed, versioned Prisma migrations.
+🧩 Provider Lifecycle & Governance
+AI provider models and terms change over time. The project documentation notes that Google lists gemini-3.1-flash-lite for shutdown on 7 May 2027 and recommends gemini-3.5-flash-lite as its replacement. The documented maintenance reminder is to remove the old fallback by 7 April 2027, then rerun npm run test:gemini after checking Google's current model documentation.
+
+Always re-check model availability, supported regions, usage terms, privacy commitments and data-processing agreements before release.
+🧰 Development Workflow
+1. Create a dedicated feature/fix branch.
+2. Inspect the repository and current Git status before editing.
+3. Keep changes narrowly scoped and preserve existing workflows.
+4. Add or update tests for changed behavior.
+5. Review Prisma migration SQL before committing schema changes.
+6. Run typecheck, lint, relevant tests and production build.
+7. Inspect the complete diff before opening a pull request.
+8. Never commit .env, API keys, passwords, database URLs or patient data.
+9. Do not merge or deploy without review and approval.
+🧯 Troubleshooting
+Issue	What to check
+Database connection or migration failure	Confirm DATABASE_URL is pooled, DIRECT_URL is direct, TLS is enabled and the target database is reachable.
+Auth/database tests refuse to run	Use a disposable local PostgreSQL database with test in its name. Never bypass the safety guard with production credentials.
+OTP/email delivery fails	Verify sender domain, provider credentials, SMTP host/port/TLS support and Render network restrictions.
+Google sign-in callback error	Compare the exact callback URI and public origin with Google Cloud Console.
+Health check succeeds but a feature fails	/api/health checks process liveness only; inspect the relevant dependency separately.
+First request after inactivity is slow	A Render Free service may be waking from sleep.
+Hospital is not approved	Applicants remain pending until a super-admin completes the required approval workflow.
+Demo availability appears	Check sample-data labels; demo inventory is fictional, not confirmed capacity.
+
+
+🤝 Contributing
+Focused improvements are welcome.
+1. Fork the repository.
+2. Create a feature branch.
+3. Preserve existing portal design and workflows unless a change is explicitly intended.
+4. Add or update tests.
+5. Run the relevant quality checks.
+6. Open a pull request describing the issue, approach, changed files and validation evidence.
+Never include real patient data, secrets, private database URLs or production credentials in issues, screenshots, fixtures or pull requests.
+📄 License
+No license grant is specified in this README. Unless a license file is added to the repository, do not assume that reuse, redistribution or commercial use is permitted.
+<div align="center"><span style="color:#F07800;">जीवन</span> <span style="color:#0B2F78;">Sahay</span>
+Technology with care. Access with trust.
+
+One connected platform for patients, hospitals and administrators.
+
+Built with Next.js · TypeScript · Prisma · PostgreSQL
+</div>
